@@ -3,10 +3,11 @@ import { getRepo } from "@/lib/session";
 import { computeDue } from "@/lib/cadence";
 import { Avatar, ContactLink, PageHeader, StatusPills, relDays, sinceText } from "@/components/ui";
 import { STATUSES, TYPES, TYPE_META } from "@/lib/types";
+import { StrengthBadge } from "@/components/Strength";
 
 export const dynamic = "force-dynamic";
 
-type SP = Promise<{ q?: string; type?: string; status?: string; sort?: string }>;
+type SP = Promise<{ q?: string; type?: string; status?: string; sort?: string; unsorted?: string }>;
 
 export default async function PeoplePage({ searchParams }: { searchParams: SP }) {
   const sp = await searchParams;
@@ -15,13 +16,16 @@ export default async function PeoplePage({ searchParams }: { searchParams: SP })
   const q = (sp.q ?? "").toLowerCase();
   const now = new Date();
 
+  const unsortedCount = all.filter((c) => !c.triaged_at).length;
   let list = all
+    .filter((c) => (sp.unsorted ? !c.triaged_at : !!c.triaged_at))
     .filter((c) => !sp.type || c.type === sp.type)
     .filter((c) => !sp.status || c.statuses.includes(sp.status as never))
     .filter((c) => !q || [c.name, c.company, c.location, c.notes].some((v) => v?.toLowerCase().includes(q)))
     .map((c) => ({ c, d: computeDue(c, now, settings.cadence) }));
 
   if (sp.sort === "due") list = list.sort((a, b) => (b.d.daysOverdue ?? -1e9) - (a.d.daysOverdue ?? -1e9));
+  if (sp.sort === "strength") list = list.sort((a, b) => (b.c.strength ?? 0) - (a.c.strength ?? 0));
   if (sp.sort === "recent") list = list.sort((a, b) => (b.c.last_contact_at ?? "").localeCompare(a.c.last_contact_at ?? ""));
 
   const href = (patch: Record<string, string | undefined>) => {
@@ -34,7 +38,7 @@ export default async function PeoplePage({ searchParams }: { searchParams: SP })
     <>
       <PageHeader
         title="People"
-        sub={`${list.length} of ${all.length}`}
+        sub={`${list.length} shown${unsortedCount && !sp.unsorted ? ` · ${unsortedCount} unsorted in your inbox` : ""}`}
         action={
           <div className="flex gap-2">
             <Link href="/import" className="btn-ghost">Import</Link>
@@ -61,7 +65,9 @@ export default async function PeoplePage({ searchParams }: { searchParams: SP })
           <Link key={s} href={href({ status: sp.status === s ? undefined : s })} className={`chip capitalize ${sp.status === s ? "!border-ink" : ""}`}>{s}</Link>
         ))}
         <span className="mx-1 w-px self-stretch bg-line" />
-        {[["", "A to Z"], ["due", "Most overdue"], ["recent", "Recently talked"]].map(([k, l]) => (
+        <Link href={href({ unsorted: sp.unsorted ? undefined : "1" })} className={`chip ${sp.unsorted ? "!border-ink" : ""}`}>Unsorted ({unsortedCount})</Link>
+        <span className="mx-1 w-px self-stretch bg-line" />
+        {[["", "A to Z"], ["due", "Most overdue"], ["recent", "Recently talked"], ["strength", "Strongest"]].map(([k, l]) => (
           <Link key={k} href={href({ sort: k || undefined })} className={`chip ${(sp.sort ?? "") === k ? "!border-ink" : ""}`}>{l}</Link>
         ))}
       </div>
@@ -75,6 +81,7 @@ export default async function PeoplePage({ searchParams }: { searchParams: SP })
             <p className={`mt-2 text-xs font-medium ${d.daysOverdue != null && d.daysOverdue >= 0 ? "text-red-600 dark:text-red-400" : "text-muted"}`}>
               {d.daysOverdue != null && d.daysOverdue >= 0 ? relDays(d.daysOverdue) : sinceText(c.last_contact_at)}
             </p>
+            <div className="mt-2 flex justify-center"><StrengthBadge value={c.strength} /></div>
             <div className="mt-2 flex justify-center"><StatusPills statuses={c.statuses} /></div>
           </ContactLink>
         ))}

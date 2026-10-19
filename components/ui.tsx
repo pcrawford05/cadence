@@ -21,7 +21,7 @@ export function Avatar({ c, size = 64 }: { c: Pick<Contact, "name" | "photo_url"
         ) : (
           <div
             className="flex h-full w-full items-center justify-center font-display font-semibold text-white"
-            style={{ background: ring, fontSize: size * 0.34 }}
+            style={{ background: c.type ? ring : "rgb(var(--muted))", fontSize: size * 0.34 }}
           >
             {initials(c.name)}
           </div>

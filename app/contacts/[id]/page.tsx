@@ -6,6 +6,7 @@ import QuickActions from "@/components/QuickActions";
 import ContactForm from "@/components/ContactForm";
 import { deleteContact, logInteraction } from "@/app/actions";
 import { TYPE_META } from "@/lib/types";
+import { StrengthBadge } from "@/components/Strength";
 
 export const dynamic = "force-dynamic";
 
@@ -43,12 +44,14 @@ export default async function ContactPage({ params, searchParams }: { params: Pr
       <aside className="rounded-3xl border border-line bg-card p-6 text-center lg:sticky lg:top-20 lg:self-start">
         <div className="flex justify-center"><Avatar c={c} size={144} /></div>
         <h1 className="mt-4 font-display text-3xl font-semibold leading-tight">{c.name}</h1>
-        <p className="text-muted">{[c.company, c.location].filter(Boolean).join(" · ")}</p>
+        <p className="text-muted">{[c.position, c.company].filter(Boolean).join(" at ")}{c.location ? ` · ${c.location}` : ""}</p>
         <div className="mt-3 flex justify-center"><StatusPills statuses={c.statuses} /></div>
         <dl className="mt-5 grid grid-cols-2 gap-3 text-left text-sm">
           <Stat k="Next" v={d.nextDue ? relDays(d.daysOverdue) : "Not scheduled"} hot={(d.daysOverdue ?? -1) >= 0} />
           <Stat k="Last" v={sinceText(c.last_contact_at).replace("Talked ", "")} />
           <Stat k="Type" v={<TypeDot type={c.type} />} />
+          <Stat k="Strength" v={<StrengthBadge value={c.strength} showLabel />} />
+          <Stat k="Source" v={c.source === "linkedin" ? "LinkedIn" : c.source === "import" ? "Spreadsheet" : "Added here"} />
           <Stat k="Cadence" v={c.cadence_days_override ? `Every ${c.cadence_days_override}d` : c.type ? TYPE_META[c.type].blurb : "None"} />
         </dl>
         <div className="mt-5 flex justify-center"><QuickActions id={c.id} compact /></div>

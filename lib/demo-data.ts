@@ -43,11 +43,38 @@ export function seedContacts(): Contact[] {
     date_met: last != null ? DD(last + 200) : null,
     cadence_days_override: null,
     priority_due: statuses.includes("priority") ? DD(-3) : null,
-    linkedin_strength: notes?.includes("level") ? 4 : null,
+    strength: [6, 4, 5, 3, 4, 7, 3, 2, 5, 3, 2, 4, 5, 3, 4, null, null, 6][i] ?? null,
+    position: null,
+    source: "import",
+    linkedin_connected_on: null,
+    triaged_at: D(300),
     notes: notes ?? null,
     snoozed_until: null,
     last_contact_at: last != null ? D(last) : null,
     created_at: D(400),
+  }));
+}
+
+// Fictional LinkedIn connections waiting in the inbox (demo only).
+const linked: Array<[string, string, string, number]> = [
+  ["Rafael Ortega", "Ramp", "Product Manager", 3],
+  ["Mina Kowalski", "Anthropic", "Research Engineer", 9],
+  ["Dev Raman", "USC Marshall", "MBA Candidate", 14],
+  ["Tessa Liu", "Sequoia Capital", "Analyst", 22],
+  ["Jamal Pierce", "Notion", "Growth Lead", 40],
+  ["Clara Benoit", "Stripe", "Software Engineer", 61],
+  ["Owen Fitzgerald", "Founders Fund", "Associate", 95],
+  ["Aisha Mensah", "Y Combinator", "Partner", 130],
+  ["Lucas Moreau", "Brex", "Head of Sales", 220],
+];
+
+export function seedLinkedIn(): Contact[] {
+  return linked.map(([name, company, position, daysAgo], i) => ({
+    id: `l${i + 1}`, user_id: "demo-user", name, company, position, location: null, type: null, statuses: [],
+    photo_url: null, linkedin_url: `https://www.linkedin.com/in/${name.toLowerCase().replace(/\s+/g, "-")}`,
+    emails: [], phone: null, date_met: null, cadence_days_override: null, priority_due: null, strength: null,
+    source: "linkedin", linkedin_connected_on: DD(daysAgo), triaged_at: null, notes: null, snoozed_until: null,
+    last_contact_at: null, created_at: D(1),
   }));
 }
 

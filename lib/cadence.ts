@@ -93,13 +93,39 @@ export function shouldNotify(daysOverdue: number): boolean {
   return daysOverdue >= 0 && daysOverdue % 7 === 0;
 }
 
-export function digestText(items: DueItem[]): { title: string; body: string } | null {
+export function digestText(items: DueItem[], inboxLeft = 0): { title: string; body: string } | null {
   const notify = items.filter((i) => shouldNotify(i.due.daysOverdue ?? -1));
-  if (notify.length === 0) return null;
+  if (notify.length === 0) {
+    if (inboxLeft <= 0) return null;
+    return { title: `${inboxLeft} new connection${inboxLeft === 1 ? "" : "s"} to sort`, body: "Takes about a minute in your Cadence inbox" };
+  }
   const names = notify.slice(0, 3).map((i) => i.contact.name);
   const more = notify.length > 3 ? ` and ${notify.length - 3} more` : "";
   return {
     title: `${notify.length} ${notify.length === 1 ? "person" : "people"} to reach out to`,
-    body: names.join(", ") + more,
+    body: names.join(", ") + more + (inboxLeft > 0 ? `. Plus ${inboxLeft} to sort in your inbox.` : ""),
   };
+}
+
+/** YYYY-MM-DD in the given time zone. */
+export function localDate(d: Date | string, tz: string): string {
+  return new Intl.DateTimeFormat("en-CA", { timeZone: tz, year: "numeric", month: "2-digit", day: "2-digit" }).format(typeof d === "string" ? new Date(d) : d);
+}
+
+export interface InboxInfo {
+  remaining: number; // untriaged total
+  doneToday: number;
+  leftToday: number; // of today's quota
+  batch: Contact[]; // what to show now
+}
+
+/** Daily triage quota: newest connections first (freshest memory), `daily` per local day. */
+export function inboxBatch(contacts: Contact[], now = new Date(), daily = 5, tz = "America/Los_Angeles", extra = 0): InboxInfo {
+  const today = localDate(now, tz);
+  const queue = contacts
+    .filter((c) => !c.triaged_at)
+    .sort((a, b) => (b.linkedin_connected_on ?? "").localeCompare(a.linkedin_connected_on ?? "") || a.name.localeCompare(b.name));
+  const doneToday = contacts.filter((c) => c.source === "linkedin" && c.triaged_at && localDate(c.triaged_at, tz) === today).length;
+  const leftToday = Math.max(0, daily - doneToday);
+  return { remaining: queue.length, doneToday, leftToday, batch: queue.slice(0, leftToday + extra) };
 }

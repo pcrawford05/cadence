@@ -57,7 +57,8 @@ function formToContact(f: FormData): ContactInput {
     statuses: f.getAll("statuses").map(String).filter((s): s is Status => (STATUSES as readonly string[]).includes(s)),
     priority_due: str("priority_due"),
     cadence_days_override: num("cadence_days_override"),
-    linkedin_strength: num("linkedin_strength"),
+    strength: num("strength"),
+    position: str("position"),
     notes: str("notes"),
   };
 }
@@ -116,4 +117,51 @@ export async function saveSettings(f: FormData) {
   await repo.updateSettings({ cadence, digest_hour: Number(f.get("digest_hour") ?? 8), timezone: String(f.get("timezone") ?? "America/Los_Angeles") });
   refresh();
   revalidatePath("/settings");
+}
+
+/* ---------------- LinkedIn import + inbox ---------------- */
+
+export async function importLinkedIn(text: string) {
+  const { parseLinkedInConnections, planLinkedInMerge } = await import("@/lib/linkedin");
+  const repo = await getRepo();
+  const conns = parseLinkedInConnections(text);
+  const plan = planLinkedInMerge(conns, await repo.listContacts());
+  await repo.createMany(plan.create);
+  for (const u of plan.update) await repo.updateContact(u.id, u.patch);
+  refresh();
+  revalidatePath("/inbox");
+  return { found: conns.length, created: plan.create.length, updated: plan.update.length, unchanged: plan.unchanged };
+}
+
+/** Save a person's details from the inbox and mark them sorted. */
+export async function triage(id: string, f: FormData) {
+  const repo = await getRepo();
+  const type = String(f.get("type") ?? "");
+  const strength = Number(f.get("strength") ?? 0);
+  const notes = String(f.get("notes") ?? "").trim();
+  const statuses = f.getAll("statuses").map(String).filter((s): s is Status => (STATUSES as readonly string[]).includes(s));
+  await repo.updateContact(id, {
+    type: (TYPES as readonly string[]).includes(type) ? (type as ContactType) : null,
+    strength: strength >= 1 && strength <= 7 ? strength : null,
+    statuses,
+    ...(notes ? { notes } : {}),
+    triaged_at: new Date().toISOString(),
+  });
+  refresh(id);
+  revalidatePath("/inbox");
+}
+
+/** Not someone to track: keep the record (so re-imports don't resurface them) but leave it untyped. */
+export async function archiveFromInbox(id: string) {
+  const repo = await getRepo();
+  await repo.updateContact(id, { triaged_at: new Date().toISOString(), type: null, statuses: [] });
+  refresh(id);
+  revalidatePath("/inbox");
+}
+
+export async function saveInboxDaily(f: FormData) {
+  const repo = await getRepo();
+  await repo.updateSettings({ inbox_daily: Math.min(50, Math.max(0, Number(f.get("inbox_daily") ?? 5))) });
+  revalidatePath("/settings");
+  revalidatePath("/inbox");
 }

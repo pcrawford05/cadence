@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { adminClient, isDemo } from "@/lib/supabase";
 import { SupabaseRepo } from "@/lib/repo";
 import { syncGoogle } from "@/lib/google";
-import { digestText, dueList } from "@/lib/cadence";
+import { digestText, dueList, inboxBatch } from "@/lib/cadence";
 import { pushToUser } from "@/lib/push";
 
 export const maxDuration = 60;
@@ -41,8 +41,9 @@ export async function GET(req: NextRequest) {
 
     if (u.last_digest_date !== localDate && localHour >= u.digest_hour) {
       const contacts = await repo.listContacts();
-      const msg = digestText(dueList(contacts, new Date(), { ...u.cadence }));
-      if (msg) r.pushed = await pushToUser(admin, u.user_id, { ...msg, url: "/" });
+      const inbox = inboxBatch(contacts, new Date(), u.inbox_daily ?? 5, u.timezone);
+      const msg = digestText(dueList(contacts, new Date(), { ...u.cadence }), Math.min(inbox.leftToday, inbox.remaining));
+      if (msg) r.pushed = await pushToUser(admin, u.user_id, { ...msg, url: msg.title.includes("to sort") ? "/inbox" : "/" });
       await admin.from("user_settings").update({ last_digest_date: localDate }).eq("user_id", u.user_id);
     }
     report.push(r);

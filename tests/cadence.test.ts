@@ -7,7 +7,7 @@ const today = new Date("2026-10-19T12:00:00Z");
 const base = (o: Partial<Contact>): Contact => ({
   id: "1", user_id: "u", name: "Test", photo_url: null, company: null, linkedin_url: null, emails: [],
   phone: null, location: null, date_met: null, type: null, cadence_days_override: null, statuses: [],
-  priority_due: null, linkedin_strength: null, notes: null, snoozed_until: null, last_contact_at: null,
+  priority_due: null, strength: null, position: null, source: "manual", linkedin_connected_on: null, triaged_at: null, notes: null, snoozed_until: null, last_contact_at: null,
   created_at: "2026-10-01T00:00:00Z", ...o,
 });
 
@@ -87,7 +87,7 @@ describe("csv import", () => {
     expect(rows).toHaveLength(3);
     expect(rows[0].contact).toMatchObject({ type: "orange", statuses: ["nurture", "priority"], priority_due: "2027-07-31", linkedin_url: "https://www.linkedin.com/in/jvale", date_met: "2024-09-01" });
     expect(rows[0].lastContact).toBe("2026-09-21");
-    expect(rows[1].contact.linkedin_strength).toBe(3);
+    expect(rows[1].contact.strength).toBe(4); // 3/5 -> 4/7
     expect(rows[2].contact.statuses).toEqual(["new"]);
   });
 });

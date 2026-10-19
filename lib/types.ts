@@ -4,6 +4,22 @@ export type ContactType = (typeof TYPES)[number];
 export const STATUSES = ["dormant", "active", "nurture", "priority", "new"] as const;
 export type Status = (typeof STATUSES)[number];
 
+export type ContactSource = "manual" | "import" | "linkedin" | "gmail" | "mcp";
+
+/** Relationship strength, 1 (weakest) to 7 (strongest). */
+export const STRENGTH_SCALE: Record<number, { label: string; hint: string }> = {
+  1: { label: "Unknown", hint: "Connected, never really interacted" },
+  2: { label: "Met once", hint: "One brief encounter" },
+  3: { label: "Acquaintance", hint: "A few light interactions" },
+  4: { label: "Familiar", hint: "Real conversation; they'd remember you" },
+  5: { label: "Warm", hint: "Ongoing; they'd take your call" },
+  6: { label: "Strong", hint: "Trusted; would go out of their way" },
+  7: { label: "Inner circle", hint: "Close mentor or friend" },
+};
+
+/** Old sheet scale 1-5 to 1-7 (1,2,3,4,5 -> 1,3,4,6,7). */
+export const rescale5to7 = (x: number) => Math.round(1 + (x - 1) * 1.5);
+
 export type InteractionKind = "email" | "meeting" | "manual" | "call";
 export type InteractionSource = "gmail" | "calendar" | "manual" | "mcp" | "import";
 
@@ -22,7 +38,11 @@ export interface Contact {
   cadence_days_override: number | null;
   statuses: Status[];
   priority_due: string | null;
-  linkedin_strength: number | null;
+  strength: number | null; // 1-7, see STRENGTH_SCALE
+  position: string | null;
+  source: ContactSource;
+  linkedin_connected_on: string | null;
+  triaged_at: string | null; // null = waiting in the inbox
   notes: string | null;
   snoozed_until: string | null;
   last_contact_at: string | null; // ISO

@@ -1,5 +1,5 @@
 import { getRepo, currentUser } from "@/lib/session";
-import { saveSettings } from "@/app/actions";
+import { saveInboxDaily, saveSettings } from "@/app/actions";
 import { PageHeader } from "@/components/ui";
 import { McpToken, PushControls, SyncNow } from "@/components/SettingsClient";
 import { TYPES, TYPE_META } from "@/lib/types";
@@ -28,6 +28,24 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
         ) : (
           <a href="/api/google/connect" className="btn-primary">Connect Google</a>
         )}
+      </Card>
+
+      <Card title="LinkedIn" sub="LinkedIn has no API for personal connections, so Cadence imports its official export. Re-import anytime; existing people are matched, never duplicated.">
+        <ol className="mb-4 list-decimal space-y-1 pl-5 text-sm">
+          <li>Request your data on LinkedIn (choose the larger archive; it includes Connections).</li>
+          <li>When LinkedIn emails you, download the archive and unzip it.</li>
+          <li>Upload <b>Connections.csv</b> on the Import page.</li>
+        </ol>
+        <div className="flex flex-wrap gap-2">
+          <a href="https://www.linkedin.com/mypreferences/d/download-my-data" target="_blank" rel="noreferrer" className="btn-primary">Request export on LinkedIn</a>
+          <a href="/import" className="btn-ghost">Upload Connections.csv</a>
+        </div>
+        <form action={saveInboxDaily} className="mt-5 flex flex-wrap items-center gap-2 text-sm">
+          <span>Sort</span>
+          <input name="inbox_daily" type="number" min={0} max={50} defaultValue={s.inbox_daily} className="input w-20 text-center" />
+          <span>new connections per day, with a reminder in the morning push.</span>
+          <button className="btn-ghost">Save</button>
+        </form>
       </Card>
 
       <Card title="Notifications" sub="One push each morning listing who is due. Overdue people repeat weekly, not daily.">

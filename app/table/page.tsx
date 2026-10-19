@@ -2,6 +2,7 @@ import Link from "next/link";
 import { getRepo } from "@/lib/session";
 import { computeDue } from "@/lib/cadence";
 import { Avatar, ContactLink, PageHeader, StatusPills, TypeDot, relDays } from "@/components/ui";
+import { StrengthBadge } from "@/components/Strength";
 
 export const dynamic = "force-dynamic";
 
@@ -18,7 +19,7 @@ export default async function TablePage() {
         <table className="w-full min-w-[960px] text-sm">
           <thead className="border-b border-line text-left text-xs uppercase tracking-wide text-muted">
             <tr>
-              {["", "Name", "Company", "Location", "Date met", "Last contact", "Next due", "Type", "Status", "Notes"].map((h) => (
+              {["", "Name", "Company", "Location", "Date met", "Last contact", "Next due", "Type", "Strength", "Status", "Notes"].map((h) => (
                 <th key={h} className="px-3 py-2.5 font-medium">{h}</th>
               ))}
             </tr>
@@ -38,6 +39,7 @@ export default async function TablePage() {
                     {d.nextDue ? <span title={relDays(d.daysOverdue)}>{fmt(d.nextDue)}</span> : <span className="text-muted">None</span>}
                   </td>
                   <td className="px-3 py-2"><TypeDot type={c.type} /></td>
+                  <td className="px-3 py-2"><StrengthBadge value={c.strength} /></td>
                   <td className="px-3 py-2"><StatusPills statuses={c.statuses} /></td>
                   <td className="max-w-[220px] truncate px-3 py-2 text-muted" title={c.notes ?? ""}>{c.notes}</td>
                 </tr>

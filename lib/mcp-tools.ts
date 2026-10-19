@@ -1,6 +1,6 @@
 import { z } from "zod";
 import type { Repo } from "./repo";
-import { computeDue, dayToISO, dueList, toDay } from "./cadence";
+import { computeDue, dayToISO, dueList, inboxBatch, toDay } from "./cadence";
 import { STATUSES, TYPES } from "./types";
 
 type Tool = {
@@ -13,7 +13,7 @@ type Tool = {
 const brief = (c: Awaited<ReturnType<Repo["listContacts"]>>[number], due?: ReturnType<typeof computeDue>) => ({
   id: c.id, name: c.name, company: c.company, location: c.location, type: c.type, statuses: c.statuses,
   last_contact: c.last_contact_at?.slice(0, 10) ?? null, next_due: due?.nextDue ?? null, days_overdue: due?.daysOverdue ?? null,
-  emails: c.emails, linkedin: c.linkedin_url,
+  emails: c.emails, linkedin: c.linkedin_url, strength: c.strength, position: c.position, sorted: !!c.triaged_at,
 });
 
 async function findOne(repo: Repo, ref: string) {
@@ -87,10 +87,13 @@ export const TOOLS: Tool[] = [
       location: z.string().optional(),
       emails: z.array(z.string()).optional(),
       priority_due: z.string().nullable().optional(),
+      strength: z.number().int().min(1).max(7).nullable().optional().describe("Relationship strength 1 (never interacted) to 7 (inner circle)"),
+      mark_sorted: z.boolean().optional().describe("Remove from the inbox"),
     }),
     async run(repo, a) {
       const c = await findOne(repo, a.contact as string);
-      const { contact: _c, append_note, ...patch } = a;
+      const { contact: _c, append_note, mark_sorted, ...patch } = a;
+      if (mark_sorted) patch.triaged_at = new Date().toISOString();
       if (append_note) patch.notes = [c.notes, append_note].filter(Boolean).join("\n");
       const u = await repo.updateContact(c.id, patch);
       return { ok: true, contact: brief(u) };
@@ -105,6 +108,16 @@ export const TOOLS: Tool[] = [
       const until = dayToISO(toDay(new Date()) + (a.days as number));
       await repo.updateContact(c.id, { snoozed_until: until });
       return { ok: true, contact: c.name, snoozed_until: until };
+    },
+  },
+  {
+    name: "list_inbox",
+    description: "Imported LinkedIn connections the user has not sorted yet (newest first), with today's quota. Help them assign type and strength with update_contact (mark_sorted: true).",
+    schema: z.object({ limit: z.number().int().min(1).max(50).optional() }),
+    async run(repo, a) {
+      const s = await repo.getSettings();
+      const info = inboxBatch(await repo.listContacts(), new Date(), s.inbox_daily, s.timezone, Math.max(0, ((a.limit as number) ?? 0) - s.inbox_daily));
+      return { remaining: info.remaining, sorted_today: info.doneToday, daily_quota: s.inbox_daily, people: info.batch.map((c) => ({ ...brief(c), connected_on: c.linkedin_connected_on })) };
     },
   },
   {

@@ -3,7 +3,7 @@ import { ImportRow } from "./csv";
 import {
   CadenceSettings, Contact, ContactInput, DEFAULT_CADENCE, Interaction, InteractionKind, InteractionSource,
 } from "./types";
-import { seedContacts, seedInteractions } from "./demo-data";
+import { seedContacts, seedInteractions, seedLinkedIn } from "./demo-data";
 
 export interface LogInput {
   contact_id: string;
@@ -21,6 +21,7 @@ export interface Settings {
   google_email: string | null;
   google_last_sync: string | null;
   has_mcp_token: boolean;
+  inbox_daily: number;
 }
 
 export interface Repo {
@@ -33,7 +34,9 @@ export interface Repo {
   listInteractions(contactId: string): Promise<Interaction[]>;
   logInteraction(i: LogInput): Promise<Interaction | null>; // null = duplicate external_id
   getSettings(): Promise<Settings>;
-  updateSettings(p: Partial<Pick<Settings, "cadence" | "digest_hour" | "timezone">>): Promise<void>;
+  updateSettings(p: Partial<Pick<Settings, "cadence" | "digest_hour" | "timezone" | "inbox_daily">>): Promise<void>;
+  /** Bulk insert (LinkedIn import can be hundreds of rows). */
+  createMany(inputs: ContactInput[]): Promise<number>;
   importRows(rows: ImportRow[]): Promise<number>;
   /** Stores the image and returns the value to save in photo_url. */
   uploadPhoto(contactId: string, file: File): Promise<string>;
@@ -46,7 +49,8 @@ function resolvePhoto(c: Contact): Contact {
 
 const CONTACT_FIELDS = [
   "name", "photo_url", "company", "linkedin_url", "emails", "phone", "location", "date_met", "type",
-  "cadence_days_override", "statuses", "priority_due", "linkedin_strength", "notes", "snoozed_until",
+  "cadence_days_override", "statuses", "priority_due", "strength", "notes", "snoozed_until",
+  "position", "source", "linkedin_connected_on", "triaged_at",
 ] as const;
 
 function pick(p: Partial<ContactInput>) {
@@ -107,11 +111,20 @@ export class SupabaseRepo implements Repo {
       google_email: data?.google_email ?? null,
       google_last_sync: data?.google_last_sync ?? null,
       has_mcp_token: !!data?.mcp_token_hash,
+      inbox_daily: data?.inbox_daily ?? 5,
     };
   }
-  async updateSettings(p: Partial<Pick<Settings, "cadence" | "digest_hour" | "timezone">>) {
+  async updateSettings(p: Partial<Pick<Settings, "cadence" | "digest_hour" | "timezone" | "inbox_daily">>) {
     const { error } = await this.db.from("user_settings").upsert({ user_id: this.userId, ...p });
     if (error) throw error;
+  }
+  async createMany(inputs: ContactInput[]) {
+    for (let i = 0; i < inputs.length; i += 500) {
+      const chunk = inputs.slice(i, i + 500).map((x) => ({ ...pick(x), user_id: this.userId }));
+      const { error } = await this.db.from("contacts").insert(chunk);
+      if (error) throw error;
+    }
+    return inputs.length;
   }
   async importRows(rows: ImportRow[]) {
     let n = 0;
@@ -143,9 +156,9 @@ const g = globalThis as unknown as { __cadenceDemo?: Store };
 function store(): Store {
   if (!g.__cadenceDemo) {
     g.__cadenceDemo = {
-      contacts: seedContacts(),
+      contacts: [...seedContacts(), ...seedLinkedIn()],
       interactions: seedInteractions(),
-      settings: { cadence: { ...DEFAULT_CADENCE }, digest_hour: 8, timezone: "America/Los_Angeles", google_email: "demo@example.com", google_last_sync: new Date(Date.now() - 3.6e6 * 7).toISOString(), has_mcp_token: false },
+      settings: { cadence: { ...DEFAULT_CADENCE }, digest_hour: 8, timezone: "America/Los_Angeles", google_email: "demo@example.com", google_last_sync: new Date(Date.now() - 3.6e6 * 7).toISOString(), has_mcp_token: false, inbox_daily: 5 },
     };
   }
   return g.__cadenceDemo;
@@ -161,8 +174,8 @@ export class DemoRepo implements Repo {
     const c: Contact = {
       id: uid(), user_id: this.userId, created_at: new Date().toISOString(), last_contact_at: null,
       photo_url: null, company: null, linkedin_url: null, emails: [], phone: null, location: null, date_met: null,
-      type: null, cadence_days_override: null, statuses: [], priority_due: null, linkedin_strength: null,
-      notes: null, snoozed_until: null, ...(pick(input) as ContactInput),
+      type: null, cadence_days_override: null, statuses: [], priority_due: null, strength: null,
+      notes: null, snoozed_until: null, position: null, source: "manual", linkedin_connected_on: null, triaged_at: new Date().toISOString(), ...(pick(input) as ContactInput),
     } as Contact;
     store().contacts.push(c);
     return c;
@@ -191,7 +204,11 @@ export class DemoRepo implements Repo {
     return row;
   }
   async getSettings() { return store().settings; }
-  async updateSettings(p: Partial<Pick<Settings, "cadence" | "digest_hour" | "timezone">>) { Object.assign(store().settings, p); }
+  async updateSettings(p: Partial<Pick<Settings, "cadence" | "digest_hour" | "timezone" | "inbox_daily">>) { Object.assign(store().settings, p); }
+  async createMany(inputs: ContactInput[]) {
+    for (const x of inputs) await this.createContact(x);
+    return inputs.length;
+  }
   async importRows(rows: ImportRow[]) {
     for (const r of rows) {
       const c = await this.createContact(r.contact);

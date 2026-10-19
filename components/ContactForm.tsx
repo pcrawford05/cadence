@@ -1,4 +1,5 @@
 import { saveContact } from "@/app/actions";
+import { StrengthPicker } from "./Strength";
 import { Contact, STATUSES, TYPES, TYPE_META } from "@/lib/types";
 
 export default function ContactForm({ c }: { c?: Contact }) {
@@ -8,6 +9,7 @@ export default function ContactForm({ c }: { c?: Contact }) {
       <div className="grid gap-4 sm:grid-cols-2">
         <Field name="name" label="Name" required defaultValue={c?.name} />
         <Field name="company" label="Company" defaultValue={c?.company} />
+        <Field name="position" label="Position" defaultValue={c?.position} />
         <Field name="location" label="Location" defaultValue={c?.location} />
         <Field name="emails" label="Emails (comma separated)" defaultValue={c?.emails.join(", ")} hint="Used to match Gmail and Calendar" />
         <Field name="linkedin_url" label="LinkedIn URL" defaultValue={c?.linkedin_url} />
@@ -49,10 +51,11 @@ export default function ContactForm({ c }: { c?: Contact }) {
         </div>
       </fieldset>
 
+      <StrengthPicker value={c?.strength} />
+
       <div className="grid gap-4 sm:grid-cols-3">
         <Field name="priority_due" label="Priority deadline" type="date" defaultValue={c?.priority_due} hint="Used when Priority is on" />
         <Field name="cadence_days_override" label="Custom cadence (days)" type="number" defaultValue={c?.cadence_days_override?.toString()} hint="Overrides the type" />
-        <Field name="linkedin_strength" label="LinkedIn strength (1 to 5)" type="number" defaultValue={c?.linkedin_strength?.toString()} />
       </div>
 
       <div>

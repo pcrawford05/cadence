@@ -1,4 +1,4 @@
-import { ContactInput, ContactType, STATUSES, Status, TYPES } from "./types";
+import { ContactInput, ContactType, STATUSES, Status, TYPES, rescale5to7 } from "./types";
 
 /** Minimal RFC 4180 CSV parser (quotes, escaped quotes, newlines in fields). */
 export function parseCSV(text: string): string[][] {
@@ -31,7 +31,7 @@ const HEADER_MAP: Record<string, keyof ContactInput | "last_contact" | "skip"> =
   linkedin: "linkedin_url", email: "emails", emails: "emails", phone: "phone",
   location: "location", datemet: "date_met",
   lastcontactdate: "last_contact", lastcontact: "last_contact",
-  type: "type", status: "statuses", notes: "notes",
+  type: "type", status: "statuses", notes: "notes", strength: "strength", strength17: "strength", position: "position",
 };
 
 /** Accepts M/D/YYYY, YYYY-MM-DD. Returns YYYY-MM-DD or null. */
@@ -90,6 +90,7 @@ export function mapRows(rows: string[][], today = new Date()): ImportRow[] {
           break;
         }
         case "date_met": c.date_met = parseDate(v); break;
+        case "strength": { const n = Number(v); if (n >= 1 && n <= 7) c.strength = n; break; }
         case "last_contact": lastContact = parseDate(v); break;
         case "photo_url": if (/^https?:\/\//.test(v)) c.photo_url = v; break;
         case "linkedin_url": c.linkedin_url = v.startsWith("http") ? v : `https://www.${v.replace(/^www\./, "")}`; break;
@@ -99,7 +100,7 @@ export function mapRows(rows: string[][], today = new Date()): ImportRow[] {
     if (!c.name) continue;
     if (c.notes) {
       const lvl = c.notes.match(/relationship level:\s*(\d)\s*\/\s*5/i);
-      if (lvl) c.linkedin_strength = Number(lvl[1]);
+      if (lvl) c.strength = rescale5to7(Number(lvl[1]));
       const by = parseByEndOf(c.notes, today);
       if (by) { c.priority_due = by; warnings.push(`Priority deadline set to ${by} from note`); }
     }

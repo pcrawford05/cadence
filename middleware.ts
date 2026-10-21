@@ -16,9 +16,10 @@ export async function middleware(req: NextRequest) {
       },
     },
   });
-  const { data } = await db.auth.getUser();
+  // getClaims verifies the JWT locally (no Auth round trip) and refreshes the session cookie when needed.
+  const { data } = await db.auth.getClaims();
   const path = req.nextUrl.pathname;
-  if (!data.user && !PUBLIC.some((p) => path.startsWith(p))) {
+  if (!data?.claims?.sub && !PUBLIC.some((p) => path.startsWith(p))) {
     const url = req.nextUrl.clone();
     url.pathname = "/login";
     return NextResponse.redirect(url);

@@ -197,3 +197,65 @@ export async function setPhoto(id: string, f: FormData): Promise<{ error?: strin
   revalidatePath("/inbox");
   return {};
 }
+
+/* ---------------- Inline field edits ---------------- */
+
+const EDITABLE = {
+  name: "text", company: "text", position: "text", location: "text", phone: "text", linkedin_url: "text", notes: "text",
+  date_met: "date", priority_due: "date",
+  cadence_days_override: "int", strength: "int",
+  emails: "emails", type: "type", statuses: "statuses",
+} as const;
+export type EditableField = keyof typeof EDITABLE;
+
+/** Save one field from the profile page. Returns the saved value (normalized) or an error. */
+export async function updateField(id: string, field: EditableField, raw: unknown): Promise<{ ok: true; value: unknown } | { ok: false; error: string }> {
+  const kind = EDITABLE[field];
+  if (!kind) return { ok: false, error: "Not editable" };
+  let value: unknown = null;
+  const s = typeof raw === "string" ? raw.trim() : raw;
+  switch (kind) {
+    case "text":
+      value = s === "" ? null : String(s).slice(0, 5000);
+      if (field === "name" && !value) return { ok: false, error: "Name can't be empty" };
+      break;
+    case "date":
+      if (s && !/^\d{4}-\d{2}-\d{2}$/.test(String(s))) return { ok: false, error: "Use a date" };
+      value = s || null;
+      break;
+    case "int": {
+      if (s === "" || s == null) { value = null; break; }
+      const n = Number(s);
+      if (!Number.isInteger(n) || n < 1) return { ok: false, error: "Use a whole number" };
+      if (field === "strength" && n > 7) return { ok: false, error: "1 to 7" };
+      value = n;
+      break;
+    }
+    case "emails":
+      value = String(s ?? "").split(/[\s,;]+/).filter((e) => /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(e)).map((e) => e.toLowerCase());
+      break;
+    case "type":
+      value = s && (TYPES as readonly string[]).includes(String(s)) ? s : null;
+      break;
+    case "statuses":
+      value = Array.isArray(s) ? s.filter((x): x is Status => (STATUSES as readonly string[]).includes(String(x))) : [];
+      break;
+  }
+  const repo = await getRepo();
+  await repo.updateContact(id, { [field]: value } as Partial<ContactInput>);
+  revalidatePath("/");
+  revalidatePath("/people");
+  revalidatePath("/table");
+  revalidatePath(`/contacts/${id}`);
+  return { ok: true, value };
+}
+
+/* ---------------- Command palette ---------------- */
+
+export async function paletteIndex() {
+  const repo = await getRepo();
+  return (await repo.listContacts()).map((c) => ({
+    id: c.id, name: c.name, sub: [c.position, c.company].filter(Boolean).join(" at ") || c.location || "",
+    photo: c.photo_url, type: c.type, sorted: !!c.triaged_at,
+  }));
+}

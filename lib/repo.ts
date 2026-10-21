@@ -42,9 +42,33 @@ export interface Repo {
   uploadPhoto(contactId: string, file: File): Promise<string>;
 }
 
-/** Photos in private storage are saved as "storage:<path>" and served through /api/photo/<id>. */
-function resolvePhoto(c: Contact): Contact {
-  return c.photo_url?.startsWith("storage:") ? { ...c, photo_url: `/api/photo/${c.id}?v=${encodeURIComponent(c.photo_url.slice(-16))}` } : c;
+/*
+ * Photos in private storage are saved as "storage:<path>". Pages sign every visible photo in ONE
+ * Storage call, and signed URLs are reused for hours per server instance, so the browser can cache
+ * the image bytes (same URL across page loads) instead of re-downloading or hitting a function per avatar.
+ */
+const SIGN_TTL = 12 * 3600; // seconds the URL is valid
+const REUSE_FOR = 10 * 3600 * 1000; // ms we hand out the same URL
+const g2 = globalThis as unknown as { __signed?: Map<string, { url: string; at: number }> };
+const signedCache = (g2.__signed ??= new Map());
+
+async function signPhotos(db: SupabaseClient, contacts: Contact[]): Promise<Contact[]> {
+  const now = Date.now();
+  const need = new Set<string>();
+  for (const c of contacts) {
+    const p = c.photo_url?.startsWith("storage:") ? c.photo_url.slice(8) : null;
+    const hit = p ? signedCache.get(p) : null;
+    if (p && (!hit || now - hit.at > REUSE_FOR)) need.add(p);
+  }
+  if (need.size) {
+    const { data } = await db.storage.from("photos").createSignedUrls([...need], SIGN_TTL);
+    data?.forEach((d) => d.path && d.signedUrl && signedCache.set(d.path, { url: d.signedUrl, at: now }));
+  }
+  return contacts.map((c) => {
+    if (!c.photo_url?.startsWith("storage:")) return c;
+    const hit = signedCache.get(c.photo_url.slice(8));
+    return { ...c, photo_url: hit?.url ?? `/api/photo/${c.id}` };
+  });
 }
 
 const CONTACT_FIELDS = [
@@ -67,11 +91,11 @@ export class SupabaseRepo implements Repo {
   async listContacts() {
     const { data, error } = await this.db.from("contacts").select("*").eq("user_id", this.userId).order("name");
     if (error) throw error;
-    return (data as Contact[]).map(resolvePhoto);
+    return signPhotos(this.db, data as Contact[]);
   }
   async getContact(id: string) {
     const { data } = await this.db.from("contacts").select("*").eq("user_id", this.userId).eq("id", id).maybeSingle();
-    return data ? resolvePhoto(data as Contact) : null;
+    return data ? (await signPhotos(this.db, [data as Contact]))[0] : null;
   }
   async createContact(input: ContactInput) {
     const { data, error } = await this.db.from("contacts").insert({ ...pick(input), user_id: this.userId }).select().single();

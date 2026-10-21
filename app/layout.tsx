@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import Nav from "@/components/Nav";
+import Shortcuts from "@/components/Shortcuts";
 import { isDemo } from "@/lib/supabase";
 import "./globals.css";
 
@@ -29,6 +30,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <div className="bg-accent/10 py-1 text-center text-xs text-accent">Demo mode: sample data, nothing is saved</div>
         )}
         <Nav />
+        <Shortcuts />
         <main className="mx-auto max-w-6xl px-4 pb-28 pt-6 sm:px-6 sm:pb-12">{children}</main>
         <script dangerouslySetInnerHTML={{ __html: `if('serviceWorker' in navigator){navigator.serviceWorker.register('/sw.js').catch(()=>{})}` }} />
       </body>

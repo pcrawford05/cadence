@@ -1,6 +1,7 @@
 "use client";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { openPalette } from "./Shortcuts";
 
 const items = [
   { href: "/", label: "Due", icon: "M12 8v4l3 2M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" },
@@ -33,7 +34,10 @@ export default function Nav() {
               </Link>
             ))}
           </nav>
-          <Link href="/contacts/new" className="btn-primary ml-auto">+ Add person</Link>
+          <button onClick={openPalette} className="ml-auto flex items-center gap-2 rounded-full border border-line bg-card px-3 py-1.5 text-sm text-muted hover:text-ink" title="Search (Cmd+K)">
+            Search <kbd className="rounded border border-line px-1 text-[11px]">⌘K</kbd>
+          </button>
+          <Link href="/contacts/new" className="btn-primary">+ Add person</Link>
         </div>
       </header>
       <nav className="fixed inset-x-0 bottom-0 z-20 border-t border-line bg-paper/95 pb-[env(safe-area-inset-bottom)] backdrop-blur sm:hidden">

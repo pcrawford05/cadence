@@ -1,9 +1,9 @@
 import Link from "next/link";
 import { getRepo } from "@/lib/session";
 import { computeDue } from "@/lib/cadence";
-import { Avatar, ContactLink, PageHeader, StatusPills, relDays, sinceText } from "@/components/ui";
+import { PageHeader, relDays, sinceText } from "@/components/ui";
+import PeopleGrid from "@/components/PeopleGrid";
 import { STATUSES, TYPES, TYPE_META } from "@/lib/types";
-import { StrengthBadge } from "@/components/Strength";
 
 export const dynamic = "force-dynamic";
 
@@ -50,7 +50,7 @@ export default async function PeoplePage({ searchParams }: { searchParams: SP })
       <form className="mb-4" action="/people">
         {sp.type && <input type="hidden" name="type" value={sp.type} />}
         {sp.status && <input type="hidden" name="status" value={sp.status} />}
-        <input name="q" defaultValue={sp.q} placeholder="Search name, company, notes" className="input max-w-md rounded-full px-4" />
+        <input id="people-search" name="q" defaultValue={sp.q} placeholder="Search name, company, notes   ( / )" className="input max-w-md rounded-full px-4" />
       </form>
 
       <div className="mb-6 flex flex-wrap gap-2">
@@ -72,20 +72,17 @@ export default async function PeoplePage({ searchParams }: { searchParams: SP })
         ))}
       </div>
 
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
-        {list.map(({ c, d }) => (
-          <ContactLink key={c.id} c={c} className="group flex flex-col items-center rounded-3xl border border-line bg-card px-3 pb-4 pt-5 text-center transition hover:-translate-y-0.5 hover:shadow-lg">
-            <Avatar c={c} size={96} />
-            <h3 className="mt-3 line-clamp-1 font-semibold">{c.name}</h3>
-            <p className="line-clamp-1 text-xs text-muted">{c.company || c.location || " "}</p>
-            <p className={`mt-2 text-xs font-medium ${d.daysOverdue != null && d.daysOverdue >= 0 ? "text-red-600 dark:text-red-400" : "text-muted"}`}>
-              {d.daysOverdue != null && d.daysOverdue >= 0 ? relDays(d.daysOverdue) : sinceText(c.last_contact_at)}
-            </p>
-            <div className="mt-2 flex justify-center"><StrengthBadge value={c.strength} /></div>
-            <div className="mt-2 flex justify-center"><StatusPills statuses={c.statuses} /></div>
-          </ContactLink>
-        ))}
-      </div>
+      <PeopleGrid
+        items={list.map(({ c, d }) => {
+          const hot = d.daysOverdue != null && d.daysOverdue >= 0;
+          return {
+            c, hot,
+            dueText: hot ? relDays(d.daysOverdue) : sinceText(c.last_contact_at),
+            nextText: d.nextDue ? relDays(d.daysOverdue) : "Not scheduled",
+            lastText: sinceText(c.last_contact_at).replace("Talked ", ""),
+          };
+        })}
+      />
       {list.length === 0 && <p className="py-16 text-center text-muted">No one matches. <Link className="underline" href="/people">Clear filters</Link></p>}
     </>
   );

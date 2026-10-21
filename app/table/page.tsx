@@ -3,14 +3,20 @@ import { getRepo } from "@/lib/session";
 import { computeDue } from "@/lib/cadence";
 import { Avatar, ContactLink, PageHeader, StatusPills, TypeDot, relDays } from "@/components/ui";
 import { StrengthBadge } from "@/components/Strength";
+import Pager, { paginate } from "@/components/Pager";
+
+const PAGE_SIZE = 50;
 
 export const dynamic = "force-dynamic";
 
 const fmt = (iso: string | null) => (iso ? new Date(iso.length === 10 ? iso + "T12:00:00Z" : iso).toLocaleDateString("en-US", { month: "numeric", day: "numeric", year: "numeric" }) : "");
 
-export default async function TablePage() {
+export default async function TablePage({ searchParams }: { searchParams: Promise<{ page?: string }> }) {
+  const sp = await searchParams;
   const repo = await getRepo();
-  const [contacts, settings] = await Promise.all([repo.listContacts(), repo.getSettings()]);
+  const [all, settings] = await Promise.all([repo.listContactsBare(), repo.getSettings()]);
+  const pg = paginate(all.filter((c) => !!c.triaged_at), sp.page, PAGE_SIZE);
+  const contacts = await repo.withPhotos(pg.slice);
   const now = new Date();
   return (
     <>
@@ -48,6 +54,7 @@ export default async function TablePage() {
           </tbody>
         </table>
       </div>
+      <Pager page={pg.page} pages={pg.pages} start={pg.start} shown={contacts.length} total={pg.total} href={(n) => (n > 1 ? `/table?page=${n}` : "/table")} />
       <p className="mt-3 text-xs text-muted">Tap a name to edit. <Link href="/import" className="underline">Import from your spreadsheet</Link></p>
     </>
   );

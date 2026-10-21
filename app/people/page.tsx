@@ -3,16 +3,19 @@ import { getRepo } from "@/lib/session";
 import { computeDue } from "@/lib/cadence";
 import { PageHeader, relDays, sinceText } from "@/components/ui";
 import PeopleGrid from "@/components/PeopleGrid";
+import Pager, { paginate } from "@/components/Pager";
 import { STATUSES, TYPES, TYPE_META } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
-type SP = Promise<{ q?: string; type?: string; status?: string; sort?: string; unsorted?: string }>;
+type SP = Promise<{ q?: string; type?: string; status?: string; sort?: string; unsorted?: string; page?: string }>;
+
+const PAGE_SIZE = 60; // divides evenly into 2, 3, and 5 columns
 
 export default async function PeoplePage({ searchParams }: { searchParams: SP }) {
   const sp = await searchParams;
   const repo = await getRepo();
-  const [all, settings] = await Promise.all([repo.listContacts(), repo.getSettings()]);
+  const [all, settings] = await Promise.all([repo.listContactsBare(), repo.getSettings()]);
   const q = (sp.q ?? "").toLowerCase();
   const now = new Date();
 
@@ -28,8 +31,13 @@ export default async function PeoplePage({ searchParams }: { searchParams: SP })
   if (sp.sort === "strength") list = list.sort((a, b) => (b.c.strength ?? 0) - (a.c.strength ?? 0));
   if (sp.sort === "recent") list = list.sort((a, b) => (b.c.last_contact_at ?? "").localeCompare(a.c.last_contact_at ?? ""));
 
+  const pg = paginate(list, sp.page, PAGE_SIZE);
+  const signed = await repo.withPhotos(pg.slice.map((x) => x.c));
+  const visible = pg.slice.map((x, i) => ({ ...x, c: signed[i] }));
+
+  // Changing a filter or sort returns to page 1; only the pager sets `page`.
   const href = (patch: Record<string, string | undefined>) => {
-    const p = new URLSearchParams(Object.entries({ ...sp, ...patch }).filter(([, v]) => v) as [string, string][]);
+    const p = new URLSearchParams(Object.entries({ ...sp, page: undefined, ...patch }).filter(([, v]) => v) as [string, string][]);
     const s = p.toString();
     return s ? `/people?${s}` : "/people";
   };
@@ -50,6 +58,8 @@ export default async function PeoplePage({ searchParams }: { searchParams: SP })
       <form className="mb-4" action="/people">
         {sp.type && <input type="hidden" name="type" value={sp.type} />}
         {sp.status && <input type="hidden" name="status" value={sp.status} />}
+        {sp.sort && <input type="hidden" name="sort" value={sp.sort} />}
+        {sp.unsorted && <input type="hidden" name="unsorted" value={sp.unsorted} />}
         <input id="people-search" name="q" defaultValue={sp.q} placeholder="Search name, company, notes   ( / )" className="input max-w-md rounded-full px-4" />
       </form>
 
@@ -73,7 +83,7 @@ export default async function PeoplePage({ searchParams }: { searchParams: SP })
       </div>
 
       <PeopleGrid
-        items={list.map(({ c, d }) => {
+        items={visible.map(({ c, d }) => {
           const hot = d.daysOverdue != null && d.daysOverdue >= 0;
           return {
             c, hot,
@@ -83,6 +93,7 @@ export default async function PeoplePage({ searchParams }: { searchParams: SP })
           };
         })}
       />
+      <Pager page={pg.page} pages={pg.pages} start={pg.start} shown={visible.length} total={pg.total} href={(n) => href({ page: n > 1 ? String(n) : undefined })} />
       {list.length === 0 && <p className="py-16 text-center text-muted">No one matches. <Link className="underline" href="/people">Clear filters</Link></p>}
     </>
   );

@@ -1,7 +1,7 @@
 import { getRepo, currentUser } from "@/lib/session";
 import { saveInboxDaily, saveSettings } from "@/app/actions";
 import { PageHeader } from "@/components/ui";
-import { McpToken, PushControls, SyncNow } from "@/components/SettingsClient";
+import { FeedbackButton, McpToken, PushControls, SyncNow } from "@/components/SettingsClient";
 import { TYPES, TYPE_META } from "@/lib/types";
 import { isDemo } from "@/lib/supabase";
 
@@ -82,6 +82,10 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
 
       <Card title="Agent access (MCP)">
         <McpToken appUrl={appUrl} hasToken={s.has_mcp_token} />
+      </Card>
+
+      <Card title="Feedback" sub="Ideas or bugs go straight to Peyton by email. You never leave the app.">
+        <FeedbackButton />
       </Card>
 
       <Card title="Your data">

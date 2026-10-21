@@ -259,3 +259,47 @@ export async function paletteIndex() {
     photo: c.photo_url, type: c.type, sorted: !!c.triaged_at,
   }));
 }
+
+/* ---------------- Feedback ---------------- */
+
+const FEEDBACK_TO = process.env.FEEDBACK_TO ?? "pcrawfor@usc.edu";
+const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]!);
+
+/** Saves feedback, then emails it via Resend (if RESEND_API_KEY is set). Never leaves the app. */
+export async function sendFeedback(input: { kind: string; message: string; page: string; userAgent: string }): Promise<{ ok: boolean; error?: string }> {
+  const { currentUser } = await import("@/lib/session");
+  const { isDemo, serverClient } = await import("@/lib/supabase");
+  const user = await currentUser();
+  if (!user) return { ok: false, error: "Please sign in again." };
+  const message = input.message.trim().slice(0, 5000);
+  if (!message) return { ok: false, error: "Write a little something first." };
+  const kind = ["idea", "bug", "other"].includes(input.kind) ? input.kind : "other";
+  const page = input.page.slice(0, 300);
+  if (isDemo()) return { ok: true };
+
+  const db = await serverClient();
+  const { data: row, error } = await db.from("feedback")
+    .insert({ user_id: user.id, email: user.email, kind, message, page, user_agent: input.userAgent.slice(0, 300) })
+    .select("id").single();
+  if (error) return { ok: false, error: "Couldn't save feedback. Try again." };
+
+  const key = process.env.RESEND_API_KEY;
+  if (key) {
+    const label = ({ idea: "Idea", bug: "Bug", other: "Feedback" } as Record<string, string>)[kind] ?? "Feedback";
+    const r = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        from: process.env.FEEDBACK_FROM ?? "Cadence <onboarding@resend.dev>",
+        to: [FEEDBACK_TO],
+        reply_to: user.email || undefined,
+        subject: `Cadence ${label.toLowerCase()} from ${user.email}: ${message.slice(0, 60)}${message.length > 60 ? "…" : ""}`,
+        text: `${label} from ${user.email}\nPage: ${page}\n\n${message}\n\n${input.userAgent}`,
+        html: `<p><b>${label}</b> from ${esc(user.email)}<br><span style="color:#71717a">Page: ${esc(page)}</span></p><p style="white-space:pre-wrap;font-size:15px">${esc(message)}</p><p style="color:#a1a1aa;font-size:12px">${esc(input.userAgent)}</p>`,
+      }),
+      signal: AbortSignal.timeout(8000),
+    }).catch(() => null);
+    if (r?.ok) await db.from("feedback").update({ emailed: true }).eq("id", row.id);
+  }
+  return { ok: true };
+}

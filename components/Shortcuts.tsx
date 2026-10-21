@@ -19,6 +19,7 @@ const ACTIONS: Item[] = [
   ...GO.map((g) => ({ kind: "go" as const, label: `Go to ${g.label}`, href: g.href, hint: `G ${g.key.toUpperCase()}` })),
   { kind: "go", label: "Add a person", href: "/contacts/new", hint: "N" },
   { kind: "go", label: "Import contacts or LinkedIn", href: "/import" },
+  { kind: "go", label: "Send feedback", href: "#feedback", hint: "F" },
 ];
 
 const isTyping = (t: EventTarget | null) => {
@@ -110,7 +111,12 @@ function Palette({ onClose }: { onClose: () => void }) {
   useEffect(() => setSel(0), [q]);
   useEffect(() => { listRef.current?.querySelector(`[data-i="${sel}"]`)?.scrollIntoView({ block: "nearest" }); }, [sel]);
 
-  const go = (it?: Item) => { if (!it) return; onClose(); router.push(it.href); };
+  const go = (it?: Item) => {
+    if (!it) return;
+    onClose();
+    if (it.href === "#feedback") window.dispatchEvent(new CustomEvent("cadence:feedback"));
+    else router.push(it.href);
+  };
 
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/30 px-4 pt-[12vh] backdrop-blur-[2px]" onMouseDown={onClose}>
@@ -168,6 +174,7 @@ function Help({ onClose }: { onClose: () => void }) {
     ["N", "Add a person"], ["/", "Search (People page) or open palette"],
     ["Space", "Peek at the hovered person (People page)"], ["← →", "Previous / next person while peeking"],
     ["⌘ V", "Paste a photo (hover an avatar, or anywhere on a profile)"],
+    ["F", "Send feedback"],
     ["?", "Show this list"], ["Esc", "Close"],
   ];
   return (

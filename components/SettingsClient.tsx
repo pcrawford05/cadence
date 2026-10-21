@@ -95,3 +95,7 @@ export function McpToken({ appUrl, hasToken }: { appUrl: string; hasToken: boole
     </div>
   );
 }
+
+export function FeedbackButton() {
+  return <button onClick={() => window.dispatchEvent(new CustomEvent("cadence:feedback"))} className="btn-primary">Send feedback</button>;
+}

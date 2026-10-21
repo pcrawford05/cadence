@@ -27,6 +27,9 @@ export interface Settings {
 export interface Repo {
   userId: string;
   listContacts(): Promise<Contact[]>;
+  /** Same rows without signing photo links; pair with withPhotos() on the slice you render. */
+  listContactsBare(): Promise<Contact[]>;
+  withPhotos(contacts: Contact[]): Promise<Contact[]>;
   getContact(id: string): Promise<Contact | null>;
   createContact(input: ContactInput): Promise<Contact>;
   updateContact(id: string, patch: Partial<ContactInput>): Promise<Contact>;
@@ -88,10 +91,16 @@ function pick(p: Partial<ContactInput>) {
 export class SupabaseRepo implements Repo {
   constructor(private db: SupabaseClient, public userId: string) {}
 
-  async listContacts() {
+  async listContactsBare() {
     const { data, error } = await this.db.from("contacts").select("*").eq("user_id", this.userId).order("name");
     if (error) throw error;
-    return signPhotos(this.db, data as Contact[]);
+    return data as Contact[];
+  }
+  async listContacts() {
+    return signPhotos(this.db, await this.listContactsBare());
+  }
+  async withPhotos(contacts: Contact[]) {
+    return signPhotos(this.db, contacts);
   }
   async getContact(id: string) {
     const { data } = await this.db.from("contacts").select("*").eq("user_id", this.userId).eq("id", id).maybeSingle();
@@ -193,6 +202,8 @@ const uid = () => Math.random().toString(36).slice(2, 10);
 export class DemoRepo implements Repo {
   userId = "demo-user";
   async listContacts() { return [...store().contacts].sort((a, b) => a.name.localeCompare(b.name)); }
+  async listContactsBare() { return this.listContacts(); }
+  async withPhotos(c: Contact[]) { return c; }
   async getContact(id: string) { return store().contacts.find((c) => c.id === id) ?? null; }
   async createContact(input: ContactInput) {
     const c: Contact = {

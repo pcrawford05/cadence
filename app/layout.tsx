@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import Nav from "@/components/Nav";
 import Shortcuts from "@/components/Shortcuts";
+import Feedback from "@/components/Feedback";
 import { isDemo } from "@/lib/supabase";
 import "./globals.css";
 
@@ -31,6 +32,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         )}
         <Nav />
         <Shortcuts />
+        <Feedback />
         <main className="mx-auto max-w-6xl px-4 pb-28 pt-6 sm:px-6 sm:pb-12">{children}</main>
         <script dangerouslySetInnerHTML={{ __html: `if('serviceWorker' in navigator){navigator.serviceWorker.register('/sw.js').catch(()=>{})}` }} />
       </body>

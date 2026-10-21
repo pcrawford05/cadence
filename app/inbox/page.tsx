@@ -1,8 +1,9 @@
 import Link from "next/link";
 import { getRepo } from "@/lib/session";
 import { inboxBatch } from "@/lib/cadence";
-import { Avatar, PageHeader } from "@/components/ui";
+import { PageHeader } from "@/components/ui";
 import { StrengthPicker } from "@/components/Strength";
+import PhotoDrop from "@/components/PhotoDrop";
 import { archiveFromInbox, triage } from "@/app/actions";
 import { TYPES, TYPE_META } from "@/lib/types";
 
@@ -55,13 +56,13 @@ export default async function InboxPage({ searchParams }: { searchParams: Promis
         {info.batch.map((c) => (
           <article key={c.id} className="rounded-3xl border border-line bg-card p-5">
             <div className="flex items-start gap-4">
-              <Avatar c={c} size={64} />
+              <PhotoDrop id={c.id} name={c.name} photo={c.photo_url} type={c.type} size={72} />
               <div className="min-w-0 flex-1">
                 <h2 className="text-lg font-semibold leading-tight">{c.name}</h2>
                 <p className="text-sm text-muted">{[c.position, c.company].filter(Boolean).join(" at ") || "No title on LinkedIn"}</p>
                 <div className="mt-1 flex flex-wrap gap-x-3 text-xs text-muted">
                   {c.linkedin_connected_on && <span>Connected {fmt(c.linkedin_connected_on)}</span>}
-                  {c.linkedin_url && <a href={c.linkedin_url} target="_blank" rel="noreferrer" className="underline">View LinkedIn</a>}
+                  {c.linkedin_url && <a href={c.linkedin_url} target="_blank" rel="noreferrer" className="underline">Open LinkedIn to copy photo</a>}
                 </div>
               </div>
             </div>

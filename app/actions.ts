@@ -165,3 +165,35 @@ export async function saveInboxDaily(f: FormData) {
   revalidatePath("/settings");
   revalidatePath("/inbox");
 }
+
+/* ---------------- Photos ---------------- */
+
+const MAX_PHOTO = 5_000_000;
+
+/** Save a photo from an uploaded file or an image URL the user pasted or dropped. */
+export async function setPhoto(id: string, f: FormData): Promise<{ error?: string }> {
+  const repo = await getRepo();
+  let file = f.get("file");
+  const url = String(f.get("url") ?? "").trim();
+  if (!(file instanceof File) && url) {
+    if (!/^https:\/\//i.test(url)) return { error: "Only https image links are supported." };
+    try {
+      const r = await fetch(url, { signal: AbortSignal.timeout(10_000) });
+      const type = r.headers.get("content-type") ?? "";
+      if (!r.ok || !type.startsWith("image/")) return { error: "That link isn't an image. Use Copy Image instead." };
+      const buf = await r.arrayBuffer();
+      if (buf.byteLength > MAX_PHOTO) return { error: "Image is over 5 MB." };
+      file = new File([buf], "photo", { type });
+    } catch {
+      return { error: "Couldn't download that image. Use Copy Image instead." };
+    }
+  }
+  if (!(file instanceof File) || file.size === 0) return { error: "No image found." };
+  if (file.size > MAX_PHOTO) return { error: "Image is over 5 MB." };
+  if (!file.type.startsWith("image/")) return { error: "That file isn't an image." };
+  const stored = await repo.uploadPhoto(id, file);
+  await repo.updateContact(id, { photo_url: stored });
+  refresh(id);
+  revalidatePath("/inbox");
+  return {};
+}

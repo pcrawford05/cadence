@@ -7,6 +7,7 @@ import ContactForm from "@/components/ContactForm";
 import { deleteContact, logInteraction } from "@/app/actions";
 import { TYPE_META } from "@/lib/types";
 import { StrengthBadge } from "@/components/Strength";
+import PhotoDrop from "@/components/PhotoDrop";
 
 export const dynamic = "force-dynamic";
 
@@ -42,7 +43,7 @@ export default async function ContactPage({ params, searchParams }: { params: Pr
   return (
     <div className="grid gap-6 lg:grid-cols-[360px_1fr]">
       <aside className="rounded-3xl border border-line bg-card p-6 text-center lg:sticky lg:top-20 lg:self-start">
-        <div className="flex justify-center"><Avatar c={c} size={144} /></div>
+        <div className="flex justify-center"><PhotoDrop id={c.id} name={c.name} photo={c.photo_url} type={c.type} size={144} pageLevel /></div>
         <h1 className="mt-4 font-display text-3xl font-semibold leading-tight">{c.name}</h1>
         <p className="text-muted">{[c.position, c.company].filter(Boolean).join(" at ")}{c.location ? ` · ${c.location}` : ""}</p>
         <div className="mt-3 flex justify-center"><StatusPills statuses={c.statuses} /></div>

@@ -44,7 +44,7 @@ export interface Repo {
 
 /** Photos in private storage are saved as "storage:<path>" and served through /api/photo/<id>. */
 function resolvePhoto(c: Contact): Contact {
-  return c.photo_url?.startsWith("storage:") ? { ...c, photo_url: `/api/photo/${c.id}` } : c;
+  return c.photo_url?.startsWith("storage:") ? { ...c, photo_url: `/api/photo/${c.id}?v=${encodeURIComponent(c.photo_url.slice(-16))}` } : c;
 }
 
 const CONTACT_FIELDS = [
@@ -137,7 +137,7 @@ export class SupabaseRepo implements Repo {
   }
   async uploadPhoto(contactId: string, file: File) {
     const ext = (file.type.split("/")[1] || "jpg").replace(/[^a-z0-9]/gi, "");
-    const path = `${this.userId}/${contactId}.${ext}`;
+    const path = `${this.userId}/${contactId}-${Date.now()}.${ext}`;
     const { error } = await this.db.storage.from("photos").upload(path, file, { upsert: true, contentType: file.type });
     if (error) throw error;
     return `storage:${path}`;

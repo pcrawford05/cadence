@@ -300,6 +300,9 @@ export async function sendFeedback(input: { kind: string; message: string; page:
       signal: AbortSignal.timeout(8000),
     }).catch(() => null);
     if (r?.ok) await db.from("feedback").update({ emailed: true }).eq("id", row.id);
+    else console.error("[feedback] Resend failed", r?.status, r ? await r.text().catch(() => "") : "no response (timeout or network)");
+  } else {
+    console.error("[feedback] RESEND_API_KEY not set; saved without emailing");
   }
   return { ok: true };
 }

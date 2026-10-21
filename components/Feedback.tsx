@@ -35,7 +35,13 @@ export default function Feedback() {
 
   const submit = () => start(async () => {
     setErr("");
-    const r = await sendFeedback({ kind, message: msg, page: path, userAgent: navigator.userAgent });
+    let r: { ok: boolean; error?: string };
+    try {
+      r = await sendFeedback({ kind, message: msg, page: path, userAgent: navigator.userAgent });
+    } catch (e) {
+      if (/Server Action/i.test(String(e))) { setErr("Cadence just updated. Reloading so you can send…"); setTimeout(() => location.reload(), 1200); return; }
+      return setErr("Couldn't send. Check your connection and try again.");
+    }
     if (!r.ok) return setErr(r.error ?? "Something went wrong.");
     setDone(true); setMsg("");
     setTimeout(() => setOpen(false), 1800);

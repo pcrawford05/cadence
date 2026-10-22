@@ -22,6 +22,7 @@ export interface SignalInput {
 
 const BASE = "https://generativelanguage.googleapis.com/v1beta";
 let resolved: string | null = null;
+let ranked: string[] = [];
 
 /** Newest generally available Flash model this key can use (Google retires names often). */
 async function pickModel(): Promise<string> {
@@ -36,7 +37,9 @@ async function pickModel(): Promise<string> {
     .filter((m) => m.gen.includes("generateContent") && /^gemini-[\d.]+-flash$|^gemini-[\d.]+-flash-latest$|^gemini-flash-latest$/.test(m.id))
     .sort((a, b) => ver(b.id) - ver(a.id));
   const fallback = models.map((m) => m.name.replace(/^models\//, "")).find((id) => /flash/.test(id) && !/lite|image|tts|live|audio|preview|exp/.test(id));
-  resolved = ok[0]?.id ?? fallback ?? "gemini-flash-latest";
+  const lite = models.map((m) => m.name.replace(/^models\//, "")).filter((id) => /^gemini-[\d.]+-flash-lite$/.test(id)).sort((a, b) => ver(b) - ver(a));
+  ranked = [...new Set([...ok.map((m) => m.id), ...(fallback ? [fallback] : []), ...lite])];
+  resolved = ranked[0] ?? "gemini-flash-latest";
   return resolved;
 }
 export const aiEnabled = () => !!process.env.GEMINI_API_KEY;
@@ -82,8 +85,10 @@ Rules:
 - Confidence: about 0.9 for a 1:1 calendar meeting or a named coffee/call; about 0.6 for an email thread; below 0.4 for ambiguous items.
 - Dates are local dates (YYYY-MM-DD). For free text, resolve words like "yesterday" relative to Today.`;
 
-async function callGemini(prompt: string, retried = false): Promise<unknown[]> {
-  const model = await pickModel();
+async function callGemini(prompt: string, retried = false, attempt = 0): Promise<unknown[]> {
+  const first = await pickModel();
+  // On overload, wait briefly, then walk down to the next available Flash model.
+  const model = attempt === 0 ? first : ranked[attempt - 1] ?? first;
   const legacy = /gemini-2\./.test(model); // 2.x takes a thinking budget; newer models choose their own
   const r = await fetch(`${BASE}/models/${model}:generateContent`, {
     method: "POST",
@@ -97,6 +102,10 @@ async function callGemini(prompt: string, retried = false): Promise<unknown[]> {
   });
   if (!r.ok) {
     const body = await r.text().catch(() => "");
+    if ((r.status === 503 || r.status === 500) && attempt < Math.min(4, ranked.length + 1)) {
+      await new Promise((ok) => setTimeout(ok, 1200));
+      return callGemini(prompt, retried, attempt + 1);
+    }
     if (r.status === 429) throw new Error("Gemini's free limit was hit. Try again in a minute.");
     if ((r.status === 404 || r.status === 400) && !retried && !process.env.GEMINI_MODEL) { resolved = null; return callGemini(prompt, true); }
     console.error(`[gemini] ${model} ${r.status}: ${body.slice(0, 500)}`);

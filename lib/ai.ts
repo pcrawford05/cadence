@@ -103,7 +103,7 @@ async function callGemini(prompt: string, retried = false, attempt = 0): Promise
   if (!r.ok) {
     const body = await r.text().catch(() => "");
     console.warn(`[gemini] ${model} ${r.status}, trying next`);
-    if ((r.status === 503 || r.status === 500 || r.status === 429) && attempt < Math.min(4, ranked.length + 1)) {
+    if ((r.status === 503 || r.status === 500 || r.status === 429) && attempt < Math.min(6, ranked.length + 1)) {
       await new Promise((ok) => setTimeout(ok, 1200));
       return callGemini(prompt, retried, attempt + 1);
     }
@@ -180,8 +180,14 @@ export async function draftsFromSignals(signals: SignalInput[], contacts: Contac
   // Small parallel batches: each call returns in a few seconds instead of one long call.
   const CHUNK = 8;
   const out: unknown[] = [];
-  for (let start = 0; start < signals.length; start += CHUNK) {
-    out.push(...(await callGemini(promptFor(signals.slice(start, start + CHUNK), start, contacts, tz, today))));
+  try {
+    for (let start = 0; start < signals.length; start += CHUNK) {
+      out.push(...(await callGemini(promptFor(signals.slice(start, start + CHUNK), start, contacts, tz, today))));
+    }
+  } catch (e) {
+    // Gemini busy or out of free quota: still give the user something to review.
+    console.warn("[gemini] falling back to simple matching:", (e as Error).message);
+    if (!out.length) return heuristic(signals, contacts, tz);
   }
   return clean(out, contacts, signals.length, today);
 }

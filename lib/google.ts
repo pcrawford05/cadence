@@ -59,14 +59,26 @@ export async function syncGoogle(
   const res: SyncResult = { emails: 0, meetings: 0, suggestions: 0, signals: 0 };
   const signals: SignalRow[] = [];
 
-  // ---- Gmail: two-way threads touched recently ----
-  const threads: string[] = [];
+  // ---- Gmail: threads you wrote in recently ----
+  // The headers-only scope (gmail.metadata) can't use search queries, so walk your SENT mail
+  // newest-first until we pass the window. Two-way threads always contain a message you sent.
+  const since = Date.now() - days * 86_400_000;
+  const threadSet = new Set<string>();
   let pageToken: string | undefined;
-  do {
-    const r = await gmail.users.threads.list({ userId: "me", q: `newer_than:${days}d -category:promotions -category:social -category:updates`, maxResults: 100, pageToken });
-    r.data.threads?.forEach((t) => t.id && threads.push(t.id));
+  let scanned = 0;
+  outer: do {
+    const r = await gmail.users.messages.list({ userId: "me", labelIds: ["SENT"], maxResults: 100, pageToken });
+    for (const m of r.data.messages ?? []) {
+      if (!m.id) continue;
+      const meta = await gmail.users.messages.get({ userId: "me", id: m.id, format: "minimal" });
+      scanned++;
+      if (Number(meta.data.internalDate ?? 0) < since) break outer;
+      if (meta.data.threadId) threadSet.add(meta.data.threadId);
+      if (scanned >= 400) break outer;
+    }
     pageToken = r.data.nextPageToken ?? undefined;
-  } while (pageToken && threads.length < 300);
+  } while (pageToken);
+  const threads = [...threadSet];
 
   for (const id of threads) {
     const t = await gmail.users.threads.get({ userId: "me", id, format: "metadata", metadataHeaders: ["From", "To", "Cc", "Subject"] });

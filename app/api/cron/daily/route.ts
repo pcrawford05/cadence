@@ -4,6 +4,7 @@ import { SupabaseRepo } from "@/lib/repo";
 import { syncGoogle } from "@/lib/google";
 import { digestText, dueList, inboxBatch } from "@/lib/cadence";
 import { pushToUser } from "@/lib/push";
+import { SupabaseRecap, generateFromSignals } from "@/lib/recap";
 
 export const maxDuration = 60;
 
@@ -45,6 +46,20 @@ export async function GET(req: NextRequest) {
       const msg = digestText(dueList(contacts, new Date(), { ...u.cadence }), Math.min(inbox.leftToday, inbox.remaining));
       if (msg) r.pushed = await pushToUser(admin, u.user_id, { ...msg, url: msg.title.includes("to sort") ? "/inbox" : "/" });
       await admin.from("user_settings").update({ last_digest_date: localDate }).eq("user_id", u.user_id);
+
+      // Every 3 days: draft the recap ahead of time, then ask who they met.
+      const lastRecap = u.last_recap_at ? Date.parse(u.last_recap_at) : 0;
+      if (Date.now() - lastRecap > 2.5 * 86_400_000) {
+        let found = 0;
+        try { found = await generateFromSignals(new SupabaseRecap(admin, u.user_id), repo, u.timezone); } catch (e) { r.recapError = (e as Error).message; }
+        r.recapPushed = await pushToUser(admin, u.user_id, {
+          title: "Who did you meet in the last 3 days?",
+          body: found ? `Found ${found} ${found === 1 ? "conversation" : "conversations"} in your calendar and email. Add anyone else you talked to.` : "Log coffee chats, calls, and texts in about a minute.",
+          url: "/recap",
+          tag: "cadence-recap",
+        });
+        await admin.from("user_settings").update({ last_recap_at: new Date().toISOString() }).eq("user_id", u.user_id);
+      }
     }
     report.push(r);
   }

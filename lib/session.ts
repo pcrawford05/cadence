@@ -27,6 +27,15 @@ export const getRepo = cache(async (): Promise<Repo> => {
   return new SupabaseRepo(db, user.id);
 });
 
+/** Recap storage (signals + proposals) for the signed-in user. */
+export async function getRecap() {
+  const { DemoRecap, SupabaseRecap } = await import("./recap");
+  if (isDemo()) return new DemoRecap();
+  const { db, user } = await session();
+  if (!user || !db) redirect("/login");
+  return new SupabaseRecap(db, user.id);
+}
+
 /** Same as getRepo but returns null instead of redirecting (for API routes). */
 export async function getRepoOrNull(): Promise<Repo | null> {
   if (isDemo()) return new DemoRepo();

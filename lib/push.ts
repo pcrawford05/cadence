@@ -13,7 +13,7 @@ function configure() {
 }
 
 /** Sends to every device the user registered; prunes dead subscriptions. Returns delivered count. */
-export async function pushToUser(admin: SupabaseClient, userId: string, payload: { title: string; body: string; url?: string }) {
+export async function pushToUser(admin: SupabaseClient, userId: string, payload: { title: string; body: string; url?: string; tag?: string }) {
   configure();
   const { data: subs } = await admin.from("push_subscriptions").select("*").eq("user_id", userId);
   let sent = 0;

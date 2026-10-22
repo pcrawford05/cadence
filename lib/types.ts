@@ -4,7 +4,10 @@ export type ContactType = (typeof TYPES)[number];
 export const STATUSES = ["dormant", "active", "nurture", "priority", "new"] as const;
 export type Status = (typeof STATUSES)[number];
 
-export type ContactSource = "manual" | "import" | "linkedin" | "gmail" | "mcp";
+export type ContactSource = "manual" | "import" | "linkedin" | "gmail" | "mcp" | "ai";
+
+/** Most people are "When relevant": tracked, but never nagged about. */
+export const DEFAULT_TYPE = "purple" as const;
 
 /** Relationship strength, 1 (weakest) to 7 (strongest). */
 export const STRENGTH_SCALE: Record<number, { label: string; hint: string }> = {

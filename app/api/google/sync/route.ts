@@ -14,7 +14,7 @@ export async function POST() {
   const { data: s } = await admin.from("user_settings").select("google_refresh_token, google_email").eq("user_id", user.id).single();
   if (!s?.google_refresh_token) return NextResponse.json({ error: "Google not connected" }, { status: 400 });
   try {
-    const r = await syncGoogle(new SupabaseRepo(admin, user.id), admin, s.google_refresh_token, s.google_email, 7);
+    const r = await syncGoogle(new SupabaseRepo(admin, user.id), admin, s.google_refresh_token, s.google_email, 3);
     await admin.from("user_settings").update({ google_last_sync: new Date().toISOString() }).eq("user_id", user.id);
     return NextResponse.json({ ok: true, ...r });
   } catch (e) {

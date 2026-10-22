@@ -31,7 +31,8 @@ export async function GET(req: NextRequest) {
 
   // Backfill the last 60 days so "last contact" is accurate from day one.
   try {
-    await syncGoogle(new SupabaseRepo(admin, user.id), admin, enc, email, 60);
+    // First connect: log history older than 3 days directly; recent activity goes to the Recap for review.
+    await syncGoogle(new SupabaseRepo(admin, user.id), admin, enc, email, 60, { autoLogBefore: new Date(Date.now() - 3 * 86_400_000) });
     await admin.from("user_settings").update({ google_last_sync: new Date().toISOString() }).eq("user_id", user.id);
   } catch {
     /* the nightly job will retry */

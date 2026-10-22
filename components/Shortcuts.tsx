@@ -10,6 +10,7 @@ type Item = { kind: "go" | "person"; label: string; sub?: string; href: string; 
 export const GO: { key: string; label: string; href: string }[] = [
   { key: "d", label: "Due", href: "/" },
   { key: "i", label: "Inbox", href: "/inbox" },
+  { key: "r", label: "Recap", href: "/recap" },
   { key: "p", label: "People", href: "/people" },
   { key: "t", label: "Table", href: "/table" },
   { key: "s", label: "Settings", href: "/settings" },
@@ -78,7 +79,7 @@ export default function Shortcuts() {
     <>
       {gPending && (
         <div className="fixed bottom-20 left-1/2 z-50 -translate-x-1/2 rounded-full bg-ink px-4 py-2 text-sm text-paper shadow-lg sm:bottom-6">
-          Go to… <span className="opacity-70">D Due · I Inbox · P People · T Table · S Settings</span>
+          Go to… <span className="opacity-70">D Due · I Inbox · R Recap · P People · T Table · S Settings</span>
         </div>
       )}
       {palette && <Palette onClose={() => setPalette(false)} />}
@@ -170,7 +171,7 @@ function Palette({ onClose }: { onClose: () => void }) {
 function Help({ onClose }: { onClose: () => void }) {
   const rows: [string, string][] = [
     ["⌘ K", "Search people and commands"],
-    ["G then D", "Due"], ["G then I", "Inbox"], ["G then P", "People"], ["G then T", "Table"], ["G then S", "Settings"],
+    ["G then D", "Due"], ["G then I", "Inbox"], ["G then R", "Recap"], ["G then P", "People"], ["G then T", "Table"], ["G then S", "Settings"],
     ["N", "Add a person"], ["/", "Search (People page) or open palette"],
     ["Space", "Peek at the hovered person (People page)"], ["← →", "Previous / next person while peeking"],
     ["⌘ V", "Paste a photo (hover an avatar, or anywhere on a profile)"],

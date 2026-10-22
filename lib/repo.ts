@@ -215,7 +215,7 @@ export class DemoRepo implements Repo {
     const c: Contact = {
       id: uid(), user_id: this.userId, created_at: new Date().toISOString(), last_contact_at: null,
       photo_url: null, company: null, linkedin_url: null, emails: [], phone: null, location: null, date_met: null,
-      type: null, cadence_days_override: null, statuses: [], priority_due: null, strength: null,
+      type: "purple", cadence_days_override: null, statuses: [], priority_due: null, strength: null,
       notes: null, snoozed_until: null, position: null, source: "manual", linkedin_connected_on: null, triaged_at: new Date().toISOString(), ...(pick(input) as ContactInput),
     } as Contact;
     store().contacts.push(c);

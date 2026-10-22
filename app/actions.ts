@@ -53,7 +53,7 @@ function formToContact(f: FormData): ContactInput {
     photo_url: str("photo_url"),
     emails: String(f.get("emails") ?? "").split(/[\s,;]+/).filter((e) => e.includes("@")).map((e) => e.toLowerCase()),
     date_met: str("date_met"),
-    type: type && (TYPES as readonly string[]).includes(type) ? (type as ContactType) : null,
+    type: type && (TYPES as readonly string[]).includes(type) ? (type as ContactType) : "purple",
     statuses: f.getAll("statuses").map(String).filter((s): s is Status => (STATUSES as readonly string[]).includes(s)),
     priority_due: str("priority_due"),
     cadence_days_override: num("cadence_days_override"),
@@ -141,7 +141,7 @@ export async function triage(id: string, f: FormData) {
   const notes = String(f.get("notes") ?? "").trim();
   const statuses = f.getAll("statuses").map(String).filter((s): s is Status => (STATUSES as readonly string[]).includes(s));
   await repo.updateContact(id, {
-    type: (TYPES as readonly string[]).includes(type) ? (type as ContactType) : null,
+    type: (TYPES as readonly string[]).includes(type) ? (type as ContactType) : "purple",
     strength: strength >= 1 && strength <= 7 ? strength : null,
     statuses,
     ...(notes ? { notes } : {}),
@@ -154,7 +154,7 @@ export async function triage(id: string, f: FormData) {
 /** Not someone to track: keep the record (so re-imports don't resurface them) but leave it untyped. */
 export async function archiveFromInbox(id: string) {
   const repo = await getRepo();
-  await repo.updateContact(id, { triaged_at: new Date().toISOString(), type: null, statuses: [] });
+  await repo.updateContact(id, { triaged_at: new Date().toISOString(), type: "purple", statuses: [] });
   refresh(id);
   revalidatePath("/inbox");
 }
@@ -314,4 +314,76 @@ export async function removePhoto(id: string): Promise<{ error?: string }> {
   refresh(id);
   revalidatePath("/inbox");
   return {};
+}
+
+/* ---------------- AI Recap ---------------- */
+
+async function recapCtx() {
+  const { getRecap } = await import("@/lib/session");
+  const repo = await getRepo();
+  const [store, s] = await Promise.all([getRecap(), repo.getSettings()]);
+  return { repo, store, tz: s.timezone };
+}
+
+/** Pull fresh Gmail/Calendar activity (if connected) and draft entries. */
+export async function scanRecap(): Promise<{ ok: boolean; added?: number; error?: string }> {
+  try {
+    const { repo, store, tz } = await recapCtx();
+    const { isDemo, adminClient } = await import("@/lib/supabase");
+    if (!isDemo()) {
+      const admin = adminClient();
+      const { data: s } = await admin.from("user_settings").select("google_refresh_token, google_email").eq("user_id", repo.userId).single();
+      if (s?.google_refresh_token) {
+        const { syncGoogle } = await import("@/lib/google");
+        const { SupabaseRepo } = await import("@/lib/repo");
+        await syncGoogle(new SupabaseRepo(admin, repo.userId), admin, s.google_refresh_token, s.google_email, 3);
+      }
+    }
+    const { generateFromSignals } = await import("@/lib/recap");
+    const added = await generateFromSignals(store, repo, tz);
+    revalidatePath("/recap");
+    return { ok: true, added };
+  } catch (e) {
+    return { ok: false, error: (e as Error).message.includes("invalid_grant") ? "Google access expired. Reconnect in Settings." : (e as Error).message };
+  }
+}
+
+export async function recapFromText(text: string): Promise<{ ok: boolean; added?: number; error?: string }> {
+  if (!text.trim()) return { ok: false, error: "Write who you talked to." };
+  try {
+    const { repo, store, tz } = await recapCtx();
+    const { generateFromText } = await import("@/lib/recap");
+    const added = await generateFromText(store, repo, text, tz);
+    revalidatePath("/recap");
+    return added ? { ok: true, added } : { ok: false, error: "Couldn't find anyone in that. Try names, e.g. “coffee with Sam Lee from Ramp yesterday about PM roles.”" };
+  } catch (e) {
+    return { ok: false, error: (e as Error).message };
+  }
+}
+
+export async function approveProposal(id: string, edits: { summary?: string; date?: string; name?: string; company?: string; position?: string } = {}) {
+  const { repo, store } = await recapCtx();
+  const { approve } = await import("@/lib/recap");
+  const r = await approve(store, repo, id, edits);
+  refresh(r.contactId);
+  revalidatePath("/recap");
+  revalidatePath("/inbox");
+  return r;
+}
+
+export async function dismissProposal(id: string) {
+  const { store } = await recapCtx();
+  await store.decide(id, "dismissed");
+  revalidatePath("/recap");
+}
+
+export async function approveAll(ids: string[]) {
+  const { repo, store } = await recapCtx();
+  const { approve } = await import("@/lib/recap");
+  let n = 0;
+  for (const id of ids) { try { await approve(store, repo, id); n++; } catch { /* already handled */ } }
+  refresh();
+  revalidatePath("/recap");
+  revalidatePath("/inbox");
+  return n;
 }

@@ -73,7 +73,7 @@ export default async function InboxPage({ searchParams }: { searchParams: Promis
                 <div className="flex flex-wrap gap-2">
                   {TYPES.map((t) => (
                     <label key={t} className="chip cursor-pointer has-[:checked]:border-ink has-[:checked]:bg-paper">
-                      <input type="radio" name="type" value={t} className="sr-only" />
+                      <input type="radio" name="type" value={t} defaultChecked={t === "purple"} className="sr-only" />
                       <span className="h-2.5 w-2.5 rounded-full" style={{ background: TYPE_META[t].hex }} />
                       {TYPE_META[t].blurb}
                     </label>

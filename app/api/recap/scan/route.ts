@@ -39,6 +39,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: false, error: "Unknown step" }, { status: 400 });
   } catch (e) {
     const m = (e as Error).message;
+    console.error(`[recap] step=${step} failed:`, e);
     return NextResponse.json({ ok: false, error: m.includes("invalid_grant") ? "Google access expired. Reconnect in Settings." : m }, { status: 200 });
   }
 }

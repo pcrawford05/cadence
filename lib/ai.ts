@@ -102,7 +102,8 @@ async function callGemini(prompt: string, retried = false, attempt = 0): Promise
   });
   if (!r.ok) {
     const body = await r.text().catch(() => "");
-    if ((r.status === 503 || r.status === 500) && attempt < Math.min(4, ranked.length + 1)) {
+    console.warn(`[gemini] ${model} ${r.status}, trying next`);
+    if ((r.status === 503 || r.status === 500 || r.status === 429) && attempt < Math.min(4, ranked.length + 1)) {
       await new Promise((ok) => setTimeout(ok, 1200));
       return callGemini(prompt, retried, attempt + 1);
     }
@@ -178,12 +179,11 @@ export async function draftsFromSignals(signals: SignalInput[], contacts: Contac
   if (!aiEnabled()) return heuristic(signals, contacts, tz);
   // Small parallel batches: each call returns in a few seconds instead of one long call.
   const CHUNK = 8;
-  const batches: Promise<unknown[]>[] = [];
+  const out: unknown[] = [];
   for (let start = 0; start < signals.length; start += CHUNK) {
-    const part = signals.slice(start, start + CHUNK);
-    batches.push(callGemini(promptFor(part, start, contacts, tz, today)));
+    out.push(...(await callGemini(promptFor(signals.slice(start, start + CHUNK), start, contacts, tz, today))));
   }
-  return clean((await Promise.all(batches)).flat(), contacts, signals.length, today);
+  return clean(out, contacts, signals.length, today);
 }
 
 function promptFor(signals: SignalInput[], offset: number, contacts: Contact[], tz: string, today: string) {

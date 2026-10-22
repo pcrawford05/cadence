@@ -120,8 +120,8 @@ function Palette({ onClose }: { onClose: () => void }) {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/30 px-4 pt-[12vh] backdrop-blur-[2px]" onMouseDown={onClose}>
-      <div role="dialog" aria-label="Command palette" className="w-full max-w-lg overflow-hidden rounded-2xl border border-line bg-card shadow-2xl" onMouseDown={(e) => e.stopPropagation()}>
+    <div className="fixed inset-0 z-50 flex items-start justify-center scrim px-4 pt-[12vh]" onMouseDown={onClose}>
+      <div role="dialog" aria-label="Command palette" className="glass pop w-full max-w-lg overflow-hidden rounded-[28px]" onMouseDown={(e) => e.stopPropagation()}>
         <input
           autoFocus
           value={q}
@@ -179,8 +179,8 @@ function Help({ onClose }: { onClose: () => void }) {
     ["?", "Show this list"], ["Esc", "Close"],
   ];
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 px-4 backdrop-blur-[2px]" onMouseDown={onClose}>
-      <div role="dialog" aria-label="Keyboard shortcuts" className="w-full max-w-md rounded-2xl border border-line bg-card p-5 shadow-2xl" onMouseDown={(e) => e.stopPropagation()}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center scrim px-4" onMouseDown={onClose}>
+      <div role="dialog" aria-label="Keyboard shortcuts" className="glass pop w-full max-w-md rounded-[28px] p-5" onMouseDown={(e) => e.stopPropagation()}>
         <h2 className="mb-3 font-display text-xl font-semibold">Keyboard shortcuts</h2>
         <dl className="space-y-1.5 text-sm">
           {rows.map(([k, v]) => (

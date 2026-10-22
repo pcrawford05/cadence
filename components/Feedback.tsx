@@ -48,8 +48,8 @@ export default function Feedback() {
   });
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/25 backdrop-blur-[2px] sm:items-center sm:px-4" onMouseDown={() => setOpen(false)}>
-      <div role="dialog" aria-label="Send feedback" onMouseDown={(e) => e.stopPropagation()} className="w-full max-w-md rounded-t-3xl border border-line bg-card p-5 shadow-2xl sm:rounded-3xl">
+    <div className="fixed inset-0 z-50 flex items-end justify-center scrim sm:items-center sm:px-4" onMouseDown={() => setOpen(false)}>
+      <div role="dialog" aria-label="Send feedback" onMouseDown={(e) => e.stopPropagation()} className="glass sheet w-full max-w-md rounded-t-[32px] p-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] sm:rounded-[32px] sm:pb-5">
         {done ? (
           <div className="py-8 text-center">
             <p className="font-display text-2xl">Thank you</p>

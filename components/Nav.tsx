@@ -1,6 +1,7 @@
 "use client";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { openPalette } from "./Shortcuts";
 import { openFeedback } from "./Feedback";
 
@@ -21,34 +22,71 @@ function Icon({ d }: { d: string }) {
   );
 }
 
+/** Slides a highlight under whichever link is active. */
+function useIndicator(path: string) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [box, setBox] = useState<{ left: number; width: number } | null>(null);
+  const measure = () => {
+    const el = ref.current?.querySelector<HTMLElement>("[data-active=true]");
+    setBox(el ? { left: el.offsetLeft, width: el.offsetWidth } : null);
+  };
+  useLayoutEffect(measure, [path]);
+  useEffect(() => { addEventListener("resize", measure); return () => removeEventListener("resize", measure); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  return { ref, box, measure };
+}
+
 export default function Nav() {
   const path = usePathname();
   const active = (h: string) => (h === "/" ? path === "/" : path.startsWith(h));
+  const top = useIndicator(path);
+  const bottom = useIndicator(path);
+  const [mini, setMini] = useState(false);
+  const [scrolled, setScrolled] = useState(false);
+
+  useEffect(() => {
+    let last = scrollY;
+    const onScroll = () => {
+      const y = scrollY;
+      setScrolled(y > 8);
+      if (Math.abs(y - last) > 6) { setMini(y > last && y > 80); last = y; }
+    };
+    addEventListener("scroll", onScroll, { passive: true });
+    return () => removeEventListener("scroll", onScroll);
+  }, []);
+  useEffect(() => { setMini(false); }, [path]);
+  // Labels change width when the pill shrinks; re-measure after it settles.
+  useEffect(() => { const t = setTimeout(bottom.measure, 320); return () => clearTimeout(t); }, [mini]); // eslint-disable-line react-hooks/exhaustive-deps
+
   return (
     <>
-      <header className="sticky top-0 z-20 hidden border-b border-line bg-paper/85 backdrop-blur sm:block">
-        <div className="mx-auto flex max-w-6xl items-center gap-8 px-6 py-3">
+      <header className="sticky top-0 z-30 hidden px-6 pt-3 sm:block">
+        <div className={`glass relative mx-auto flex max-w-6xl items-center gap-6 rounded-full py-1.5 pl-5 pr-1.5 transition-shadow ${scrolled ? "scroll-edge" : ""}`}>
           <Link href="/" className="font-display text-xl font-semibold tracking-tight">Cadence</Link>
-          <nav className="flex gap-1">
+          <nav ref={top.ref} className="relative flex gap-0.5">
+            {top.box && <span aria-hidden className="tab-active-dot absolute inset-y-0 rounded-full bg-ink" style={{ left: top.box.left, width: top.box.width }} />}
             {items.map((i) => (
-              <Link key={i.href} href={i.href} className={`rounded-full px-3 py-1.5 text-sm ${active(i.href) ? "bg-ink text-paper" : "text-muted hover:text-ink"}`}>
+              <Link key={i.href} href={i.href} data-active={active(i.href)} aria-current={active(i.href) ? "page" : undefined}
+                className={`relative rounded-full px-3 py-1.5 text-sm transition-colors duration-300 ${active(i.href) ? "text-paper" : "text-muted hover:text-ink"}`}>
                 {i.label}
               </Link>
             ))}
           </nav>
           <button onClick={openFeedback} className="ml-auto text-sm text-muted hover:text-ink" title="Send feedback (F)">Feedback</button>
-          <button onClick={openPalette} className=" flex items-center gap-2 rounded-full border border-line bg-card px-3 py-1.5 text-sm text-muted hover:text-ink" title="Search (Cmd+K)">
+          <button onClick={openPalette} className="glass-thin flex items-center gap-2 rounded-full px-3 py-1.5 text-sm text-muted hover:text-ink" title="Search (Cmd+K)">
             Search <kbd className="rounded border border-line px-1 text-[11px]">⌘K</kbd>
           </button>
-          <Link href="/contacts/new" className="btn-primary">+ Add person</Link>
+          <Link href="/contacts/new" className="btn-primary py-2">+ Add person</Link>
         </div>
       </header>
-      <nav className="fixed inset-x-0 bottom-0 z-20 border-t border-line bg-paper/95 pb-[env(safe-area-inset-bottom)] backdrop-blur sm:hidden">
-        <div className="grid grid-cols-6">
+
+      <nav aria-label="Primary" className="pointer-events-none fixed inset-x-0 bottom-0 z-30 flex justify-center px-3 pb-[max(10px,env(safe-area-inset-bottom))] sm:hidden">
+        <div ref={bottom.ref} data-mini={mini} className="tabbar glass pointer-events-auto relative flex rounded-full p-1" style={{ transformOrigin: "50% 100%" }}>
+          {bottom.box && <span aria-hidden className="tab-active-dot absolute inset-y-1 rounded-full bg-ink/[.08] dark:bg-white/10" style={{ left: bottom.box.left, width: bottom.box.width }} />}
           {items.map((i) => (
-            <Link key={i.href} href={i.href} className={`flex flex-col items-center gap-0.5 py-2 text-[11px] ${active(i.href) ? "text-ink" : "text-muted"}`}>
+            <Link key={i.href} href={i.href} data-active={active(i.href)} aria-current={active(i.href) ? "page" : undefined}
+              className={`relative flex w-[54px] flex-col items-center justify-center gap-0.5 rounded-full py-1.5 text-[10px] font-medium transition-colors ${active(i.href) ? "text-accent" : "text-ink/70"}`}>
               <Icon d={i.icon} />
-              {i.label}
+              <span className="tab-label overflow-hidden">{i.label}</span>
             </Link>
           ))}
         </div>

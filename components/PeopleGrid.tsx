@@ -88,12 +88,12 @@ function Peek({ item, pos, onClose, onPrev, onNext }: { item: GridItem; pos: str
   const act = (label: string, fn: () => Promise<unknown>) => start(async () => { await fn(); setDone(label); router.refresh(); });
 
   return (
-    <div className="fixed inset-0 z-40 flex items-end justify-center bg-black/25 backdrop-blur-[2px] sm:items-center sm:px-4" onMouseDown={onClose}>
+    <div className="fixed inset-0 z-40 flex items-end justify-center scrim sm:items-center sm:px-4" onMouseDown={onClose}>
       <div
         role="dialog"
         aria-label={`${c.name} details`}
         onMouseDown={(e) => e.stopPropagation()}
-        className="w-full max-w-md rounded-t-3xl border border-line bg-card p-5 shadow-2xl sm:rounded-3xl"
+        className="glass sheet w-full max-w-md rounded-t-[32px] p-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] sm:rounded-[32px] sm:pb-5"
       >
         <div className="flex items-start gap-4">
           <Avatar c={c} size={72} />

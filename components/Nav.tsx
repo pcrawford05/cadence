@@ -4,6 +4,8 @@ import { usePathname } from "next/navigation";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { openPalette } from "./Shortcuts";
 import { openFeedback } from "./Feedback";
+import { useRouter } from "next/navigation";
+import { scanStore } from "@/lib/scanStore";
 
 const items = [
   { href: "/", label: "Due", icon: "M12 8v4l3 2M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" },
@@ -40,7 +42,24 @@ export default function Nav() {
   const active = (h: string) => (h === "/" ? path === "/" : path.startsWith(h));
   const top = useIndicator(path);
   const bottom = useIndicator(path);
+  const router = useRouter();
   const [mini, setMini] = useState(false);
+  const [drag, setDrag] = useState<number | null>(null); // index under the finger while swiping the tab bar
+
+  // Start the day's recap as soon as the app opens, so Recap is ready when you get there.
+  useEffect(() => { if (path !== "/login" && scanStore.due()) scanStore.run(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const tabAt = (x: number) => {
+    const links = [...(bottom.ref.current?.querySelectorAll<HTMLElement>("a[data-tab]") ?? [])];
+    let best = 0, dist = Infinity;
+    links.forEach((el, i) => { const r = el.getBoundingClientRect(); const d = Math.abs(x - (r.left + r.width / 2)); if (d < dist) { dist = d; best = i; } });
+    return best;
+  };
+  const dragBox = (() => {
+    if (drag == null) return null;
+    const el = bottom.ref.current?.querySelectorAll<HTMLElement>("a[data-tab]")[drag];
+    return el ? { left: el.offsetLeft, width: el.offsetWidth } : null;
+  })();
   const [scrolled, setScrolled] = useState(false);
 
   useEffect(() => {
@@ -80,11 +99,21 @@ export default function Nav() {
       </header>
 
       <nav aria-label="Primary" className="pointer-events-none fixed inset-x-0 bottom-0 z-30 flex justify-center px-3 pb-[max(10px,env(safe-area-inset-bottom))] sm:hidden">
-        <div ref={bottom.ref} data-mini={mini} className="tabbar glass pointer-events-auto relative flex rounded-full p-1" style={{ transformOrigin: "50% 100%" }}>
-          {bottom.box && <span aria-hidden className="tab-active-dot absolute inset-y-1 rounded-full bg-ink/[.08] dark:bg-white/10" style={{ left: bottom.box.left, width: bottom.box.width }} />}
+        <div
+          ref={bottom.ref}
+          data-mini={mini && drag == null}
+          className="tabbar glass pointer-events-auto relative flex touch-none select-none rounded-full p-1"
+          style={{ transformOrigin: "50% 100%", transform: drag != null ? "scale(1.04)" : undefined }}
+          onPointerDown={(e) => { setMini(false); setDrag(tabAt(e.clientX)); (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId); }}
+          onPointerMove={(e) => { if (drag != null) { const i = tabAt(e.clientX); if (i !== drag) { setDrag(i); navigator.vibrate?.(5); } } }}
+          onPointerUp={() => { if (drag != null) { const href = items[drag].href; setDrag(null); if (!active(href)) router.push(href); } }}
+          onPointerCancel={() => setDrag(null)}
+          onClick={(e) => { if (e.detail) e.preventDefault(); }}
+        >
+          {(dragBox ?? bottom.box) && <span aria-hidden className={`tab-active-dot absolute inset-y-1 rounded-full ${drag != null ? "bg-ink/[.14] dark:bg-white/20" : "bg-ink/[.08] dark:bg-white/10"}`} style={{ left: (dragBox ?? bottom.box)!.left, width: (dragBox ?? bottom.box)!.width }} />}
           {items.map((i) => (
-            <Link key={i.href} href={i.href} data-active={active(i.href)} aria-current={active(i.href) ? "page" : undefined}
-              className={`relative flex w-[54px] flex-col items-center justify-center gap-0.5 rounded-full py-1.5 text-[10px] font-medium transition-colors ${active(i.href) ? "text-accent" : "text-ink/70"}`}>
+            <Link key={i.href} href={i.href} data-tab data-active={active(i.href)} aria-current={active(i.href) ? "page" : undefined} draggable={false}
+              className={`relative flex w-[54px] flex-col items-center justify-center gap-0.5 rounded-full py-1.5 text-[10px] font-medium transition-colors ${(drag != null ? drag === items.indexOf(i) : active(i.href)) ? "text-accent" : "text-ink/70"}`}>
               <Icon d={i.icon} />
               <span className="tab-label overflow-hidden">{i.label}</span>
             </Link>

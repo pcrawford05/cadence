@@ -94,6 +94,11 @@ body::before {
 .tabbar[data-mini="true"] .tab-label { opacity: 0; max-height: 0; }
 .tab-active-dot { transition: left 420ms var(--spring), width 420ms var(--spring); }
 
+/* Inbox: a sorted card stamps, then folds away so the next one slides up instead of jumping. */
+.inbox-row { grid-template-rows: 1fr; transition: grid-template-rows 420ms var(--ease-out) 380ms, opacity 300ms var(--ease-out) 420ms; }
+.inbox-row.is-leaving { grid-template-rows: 0fr; opacity: 0; }
+.inbox-stamp { animation: fade-in 160ms var(--ease-out); }
+
 /* Scroll-edge: content softens under the top bar instead of hard-clipping. */
 .scroll-edge::after {
   content: ""; position: absolute; inset-inline: 0; top: 100%; height: 18px; pointer-events: none;

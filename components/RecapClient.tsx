@@ -1,6 +1,7 @@
 "use client";
 import Link from "next/link";
-import { useEffect, useRef, useState, useTransition } from "react";
+import { useEffect, useState, useSyncExternalStore, useTransition } from "react";
+import { scanStore } from "@/lib/scanStore";
 import { useRouter } from "next/navigation";
 import { approveAll, approveProposal, dismissProposal, recapFromText } from "@/app/actions";
 import { Avatar } from "./ui";
@@ -23,54 +24,33 @@ export type RecapItem = {
 const KIND_LABEL = { meeting: "Met", call: "Call", email: "Email", manual: "Message" } as const;
 const fmt = (d: string) => new Date(d + "T12:00:00Z").toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
 
-type Scan = "idle" | "sync" | "draft" | "done" | "error";
-const STALE_MS = 2 * 3_600_000;
 const ago = (iso: string) => {
   const m = Math.round((Date.now() - Date.parse(iso)) / 60_000);
   return m < 1 ? "just now" : m < 60 ? `${m} min ago` : m < 1440 ? `${Math.round(m / 60)} hr ago` : `${Math.round(m / 1440)} d ago`;
 };
 
-export default function RecapClient({ items, googleConnected, ai, lastSync }: { items: RecapItem[]; googleConnected: boolean; ai: boolean; lastSync: string | null }) {
+export default function RecapClient({ items, googleConnected, ai }: { items: RecapItem[]; googleConnected: boolean; ai: boolean; lastSync?: string | null }) {
   const router = useRouter();
-  const [scan, setScan] = useState<Scan>("idle");
-  const [scanMsg, setScanMsg] = useState("");
-  const [checkedAt, setCheckedAt] = useState(lastSync);
+  const st = useSyncExternalStore(scanStore.subscribe, scanStore.get, scanStore.get);
+  const scan = st.phase;
+  const scanMsg = st.msg;
+  const checkedAt = st.at;
+  const busy = scanStore.busy();
   const [text, setText] = useState("");
   const [textErr, setTextErr] = useState("");
   const [pending, start] = useTransition();
   const [flash, setFlash] = useState<string[]>([]);
-  const ran = useRef(false);
   const notify = (m: string) => { setFlash((f) => [...f.slice(-2), m]); setTimeout(() => setFlash((f) => f.slice(1)), 4000); };
+  const runScan = () => scanStore.run(true);
 
-  // Plain fetches, not server actions: navigation stays instant while Gemini works.
-  const step = async (s: "sync" | "draft") => {
-    const r = await fetch(`/api/recap/scan?step=${s}`, { method: "POST" });
-    const j = await r.json().catch(() => ({ ok: false, error: "Scan failed. Try again." }));
-    if (!j.ok) throw new Error(j.error ?? "Scan failed");
-    return j as { ok: true; added?: number };
-  };
-  const runScan = async () => {
-    if (scan === "sync" || scan === "draft") return;
-    try {
-      setScan("sync"); await step("sync");
-      setCheckedAt(new Date().toISOString());
-      setScan("draft"); const { added = 0 } = await step("draft");
-      setScan("done");
-      setScanMsg(added ? `Found ${added} new ${added === 1 ? "conversation" : "conversations"}` : "You're up to date");
-      router.refresh();
-    } catch (e) {
-      setScan("error"); setScanMsg((e as Error).message);
-    }
-  };
-
-  // Only scan on open if the last check is stale; the daily job usually has results waiting.
+  // Shell starts the daily scan; here we just kick it if it somehow hasn't, and refresh when one lands.
   useEffect(() => {
-    if (ran.current || !googleConnected) return;
-    ran.current = true;
-    if (!lastSync || Date.now() - Date.parse(lastSync) > STALE_MS) runScan();
+    if (googleConnected && scanStore.due()) scanStore.run();
+    const on = () => router.refresh();
+    addEventListener("cadence:recap-updated", on);
+    return () => removeEventListener("cadence:recap-updated", on);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const busy = scan === "sync" || scan === "draft";
   const pendingItems = items.filter((i) => i.status === "pending");
   const done = items.filter((i) => i.status !== "pending");
 
@@ -88,7 +68,7 @@ export default function RecapClient({ items, googleConnected, ai, lastSync }: { 
                 </>
               ) : (
                 <span className={scan === "error" ? "text-red-600" : "text-muted"}>
-                  {scan === "error" ? scanMsg : scan === "done" ? `${scanMsg}. Checked just now` : checkedAt ? `Checked ${ago(checkedAt)}` : "Not checked yet"}
+                  {scan === "error" ? scanMsg : scan === "done" ? `${scanMsg}. Checked ${checkedAt ? ago(checkedAt) : "just now"}` : checkedAt ? `Checked ${ago(checkedAt)}` : "Not checked yet"}
                 </span>
               )}
               <button onClick={runScan} disabled={busy} className="btn-ghost py-1 text-xs">{busy ? "Working" : scan === "error" ? "Try again" : "Check now"}</button>

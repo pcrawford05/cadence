@@ -12,14 +12,17 @@ export const maxDuration = 60;
  *   POST ?step=draft  turn pending signals into proposals with Gemini
  */
 export async function POST(req: Request) {
-  const step = new URL(req.url).searchParams.get("step");
+  const q = new URL(req.url).searchParams;
+  const step = q.get("step");
+  const force = q.get("force") === "1";
   try {
     const repo = await getRepo();
     if (step === "sync") {
       if (isDemo()) { await new Promise((r) => setTimeout(r, 600)); return NextResponse.json({ ok: true, connected: true }); }
       const admin = adminClient();
-      const { data: s } = await admin.from("user_settings").select("google_refresh_token, google_email").eq("user_id", repo.userId).single();
+      const { data: s } = await admin.from("user_settings").select("google_refresh_token, google_email, google_last_sync").eq("user_id", repo.userId).single();
       if (!s?.google_refresh_token) return NextResponse.json({ ok: true, connected: false });
+      if (!force && s.google_last_sync && Date.now() - Date.parse(s.google_last_sync) < 3_600_000) return NextResponse.json({ ok: true, connected: true, skipped: true });
       const { syncGoogle } = await import("@/lib/google");
       const { SupabaseRepo } = await import("@/lib/repo");
       await syncGoogle(new SupabaseRepo(admin, repo.userId), admin, s.google_refresh_token, s.google_email, 3);

@@ -30,6 +30,8 @@ export async function GET(req: NextRequest) {
       if (u.google_refresh_token && u.google_email) {
         r.sync = await syncGoogle(repo, admin, u.google_refresh_token, u.google_email);
         await admin.from("user_settings").update({ google_last_sync: new Date().toISOString() }).eq("user_id", u.user_id);
+        // Draft every day so the Recap page opens with results instead of waiting on Gemini.
+        try { r.drafted = await generateFromSignals(new SupabaseRecap(admin, u.user_id), repo, u.timezone); } catch (e) { r.recapError = (e as Error).message; }
       }
     } catch (e) {
       r.syncError = (e as Error).message; // e.g. expired refresh token: user must reconnect
@@ -50,8 +52,8 @@ export async function GET(req: NextRequest) {
       // Every 3 days: draft the recap ahead of time, then ask who they met.
       const lastRecap = u.last_recap_at ? Date.parse(u.last_recap_at) : 0;
       if (Date.now() - lastRecap > 2.5 * 86_400_000) {
-        let found = 0;
-        try { found = await generateFromSignals(new SupabaseRecap(admin, u.user_id), repo, u.timezone); } catch (e) { r.recapError = (e as Error).message; }
+        const { count } = await admin.from("proposals").select("id", { count: "exact", head: true }).eq("user_id", u.user_id).eq("status", "pending");
+        const found = count ?? 0;
         r.recapPushed = await pushToUser(admin, u.user_id, {
           title: "Who did you meet in the last 3 days?",
           body: found ? `Found ${found} ${found === 1 ? "conversation" : "conversations"} in your calendar and email. Add anyone else you talked to.` : "Log coffee chats, calls, and texts in about a minute.",

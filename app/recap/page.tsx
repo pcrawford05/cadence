@@ -28,7 +28,7 @@ export default async function RecapPage() {
   return (
     <>
       <PageHeader title="Recap" sub="Who did you meet in the last 3 days, and what did you talk about?" />
-      <RecapClient items={items} googleConnected={isDemo() || !!settings.google_email} ai={aiEnabled() || isDemo()} />
+      <RecapClient items={items} googleConnected={isDemo() || !!settings.google_email} ai={aiEnabled() || isDemo()} lastSync={settings.google_last_sync} />
     </>
   );
 }

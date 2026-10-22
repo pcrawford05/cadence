@@ -2,7 +2,7 @@
 import Link from "next/link";
 import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { approveAll, approveProposal, dismissProposal, recapFromText, scanRecap } from "@/app/actions";
+import { approveAll, approveProposal, dismissProposal, recapFromText } from "@/app/actions";
 import { Avatar } from "./ui";
 import type { ContactType } from "@/lib/types";
 
@@ -23,10 +23,18 @@ export type RecapItem = {
 const KIND_LABEL = { meeting: "Met", call: "Call", email: "Email", manual: "Message" } as const;
 const fmt = (d: string) => new Date(d + "T12:00:00Z").toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
 
-export default function RecapClient({ items, googleConnected, ai }: { items: RecapItem[]; googleConnected: boolean; ai: boolean }) {
+type Scan = "idle" | "sync" | "draft" | "done" | "error";
+const STALE_MS = 2 * 3_600_000;
+const ago = (iso: string) => {
+  const m = Math.round((Date.now() - Date.parse(iso)) / 60_000);
+  return m < 1 ? "just now" : m < 60 ? `${m} min ago` : m < 1440 ? `${Math.round(m / 60)} hr ago` : `${Math.round(m / 1440)} d ago`;
+};
+
+export default function RecapClient({ items, googleConnected, ai, lastSync }: { items: RecapItem[]; googleConnected: boolean; ai: boolean; lastSync: string | null }) {
   const router = useRouter();
-  const [scan, setScan] = useState<"idle" | "running" | "done" | "error">("idle");
+  const [scan, setScan] = useState<Scan>("idle");
   const [scanMsg, setScanMsg] = useState("");
+  const [checkedAt, setCheckedAt] = useState(lastSync);
   const [text, setText] = useState("");
   const [textErr, setTextErr] = useState("");
   const [pending, start] = useTransition();
@@ -34,20 +42,35 @@ export default function RecapClient({ items, googleConnected, ai }: { items: Rec
   const ran = useRef(false);
   const notify = (m: string) => { setFlash((f) => [...f.slice(-2), m]); setTimeout(() => setFlash((f) => f.slice(1)), 4000); };
 
-  const runScan = () => {
-    setScan("running");
-    start(async () => {
-      const r = await scanRecap();
-      if (!r.ok) { setScan("error"); setScanMsg(r.error ?? "Scan failed"); return; }
+  // Plain fetches, not server actions: navigation stays instant while Gemini works.
+  const step = async (s: "sync" | "draft") => {
+    const r = await fetch(`/api/recap/scan?step=${s}`, { method: "POST" });
+    const j = await r.json().catch(() => ({ ok: false, error: "Scan failed. Try again." }));
+    if (!j.ok) throw new Error(j.error ?? "Scan failed");
+    return j as { ok: true; added?: number };
+  };
+  const runScan = async () => {
+    if (scan === "sync" || scan === "draft") return;
+    try {
+      setScan("sync"); await step("sync");
+      setCheckedAt(new Date().toISOString());
+      setScan("draft"); const { added = 0 } = await step("draft");
       setScan("done");
-      setScanMsg(r.added ? `Found ${r.added} new ${r.added === 1 ? "conversation" : "conversations"}.` : "Nothing new since your last scan.");
+      setScanMsg(added ? `Found ${added} new ${added === 1 ? "conversation" : "conversations"}` : "You're up to date");
       router.refresh();
-    });
+    } catch (e) {
+      setScan("error"); setScanMsg((e as Error).message);
+    }
   };
 
-  // Scan automatically when you open the page.
-  useEffect(() => { if (!ran.current && googleConnected) { ran.current = true; runScan(); } }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  // Only scan on open if the last check is stale; the daily job usually has results waiting.
+  useEffect(() => {
+    if (ran.current || !googleConnected) return;
+    ran.current = true;
+    if (!lastSync || Date.now() - Date.parse(lastSync) > STALE_MS) runScan();
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
+  const busy = scan === "sync" || scan === "draft";
   const pendingItems = items.filter((i) => i.status === "pending");
   const done = items.filter((i) => i.status !== "pending");
 
@@ -56,9 +79,21 @@ export default function RecapClient({ items, googleConnected, ai }: { items: Rec
       <div className="flex flex-wrap items-center gap-3 text-sm">
         {googleConnected ? (
           <>
-            <button onClick={runScan} disabled={scan === "running"} className="btn-ghost">{scan === "running" ? "Checking calendar and email…" : "Scan again"}</button>
-            {scan === "running" && <span className="animate-pulse text-muted">Reading the last 3 days{ai ? " with Gemini" : ""}…</span>}
-            {scan !== "running" && scanMsg && <span className={scan === "error" ? "text-red-600" : "text-muted"}>{scanMsg}</span>}
+            <div aria-live="polite" className="glass-thin flex items-center gap-2.5 rounded-full py-1.5 pl-3 pr-1.5">
+              {busy ? (
+                <>
+                  <span className="relative flex h-2.5 w-2.5"><span className="absolute inset-0 animate-ping rounded-full bg-accent/50" /><span className="relative h-2.5 w-2.5 rounded-full bg-accent" /></span>
+                  <span className="text-ink">{scan === "sync" ? "Checking calendar and email" : ai ? "Summarizing with Gemini" : "Matching people"}</span>
+                  <span className="text-muted">{scan === "sync" ? "1 of 2" : "2 of 2"}</span>
+                </>
+              ) : (
+                <span className={scan === "error" ? "text-red-600" : "text-muted"}>
+                  {scan === "error" ? scanMsg : scan === "done" ? `${scanMsg}. Checked just now` : checkedAt ? `Checked ${ago(checkedAt)}` : "Not checked yet"}
+                </span>
+              )}
+              <button onClick={runScan} disabled={busy} className="btn-ghost py-1 text-xs">{busy ? "Working" : scan === "error" ? "Try again" : "Check now"}</button>
+            </div>
+            {busy && <span className="text-xs text-muted">Keep working; this runs in the background.</span>}
           </>
         ) : (
           <p className="text-muted">Connect Google in <Link href="/settings" className="underline">Settings</Link> to pull meetings from your calendar and email.</p>
@@ -85,9 +120,11 @@ export default function RecapClient({ items, googleConnected, ai }: { items: Rec
             </button>
           )}
         </div>
-        {pendingItems.length === 0 ? (
+        {pendingItems.length === 0 && busy ? (
+          <div className="space-y-3" aria-hidden>{[0, 1].map((k) => <div key={k} className="h-36 animate-pulse rounded-3xl border border-line bg-card" />)}</div>
+        ) : pendingItems.length === 0 ? (
           <p className="rounded-3xl border border-dashed border-line p-8 text-center text-sm text-muted">
-            {scan === "running" ? "Looking for conversations…" : "Nothing to review. Add anyone you talked to below."}
+            {busy ? "Looking for conversations. New ones appear here." : "Nothing to review. Add anyone you talked to below."}
           </p>
         ) : (
           <div className="space-y-3">{pendingItems.map((i) => <Card key={i.id} item={i} onDone={notify} />)}</div>

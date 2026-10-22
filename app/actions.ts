@@ -325,29 +325,6 @@ async function recapCtx() {
   return { repo, store, tz: s.timezone };
 }
 
-/** Pull fresh Gmail/Calendar activity (if connected) and draft entries. */
-export async function scanRecap(): Promise<{ ok: boolean; added?: number; error?: string }> {
-  try {
-    const { repo, store, tz } = await recapCtx();
-    const { isDemo, adminClient } = await import("@/lib/supabase");
-    if (!isDemo()) {
-      const admin = adminClient();
-      const { data: s } = await admin.from("user_settings").select("google_refresh_token, google_email").eq("user_id", repo.userId).single();
-      if (s?.google_refresh_token) {
-        const { syncGoogle } = await import("@/lib/google");
-        const { SupabaseRepo } = await import("@/lib/repo");
-        await syncGoogle(new SupabaseRepo(admin, repo.userId), admin, s.google_refresh_token, s.google_email, 3);
-      }
-    }
-    const { generateFromSignals } = await import("@/lib/recap");
-    const added = await generateFromSignals(store, repo, tz);
-    revalidatePath("/recap");
-    return { ok: true, added };
-  } catch (e) {
-    return { ok: false, error: (e as Error).message.includes("invalid_grant") ? "Google access expired. Reconnect in Settings." : (e as Error).message };
-  }
-}
-
 export async function recapFromText(text: string): Promise<{ ok: boolean; added?: number; error?: string }> {
   if (!text.trim()) return { ok: false, error: "Write who you talked to." };
   try {

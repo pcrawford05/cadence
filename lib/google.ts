@@ -66,22 +66,33 @@ export async function syncGoogle(
   const threadSet = new Set<string>();
   let pageToken: string | undefined;
   let scanned = 0;
-  outer: do {
+  let done = false;
+  // Fetch dates 25 at a time; Gmail allows it and sequential gets were the slow part of a scan.
+  do {
     const r = await gmail.users.messages.list({ userId: "me", labelIds: ["SENT"], maxResults: 100, pageToken });
-    for (const m of r.data.messages ?? []) {
-      if (!m.id) continue;
-      const meta = await gmail.users.messages.get({ userId: "me", id: m.id, format: "minimal" });
-      scanned++;
-      if (Number(meta.data.internalDate ?? 0) < since) break outer;
-      if (meta.data.threadId) threadSet.add(meta.data.threadId);
-      if (scanned >= 400) break outer;
+    const ids = (r.data.messages ?? []).map((m) => m.id!).filter(Boolean);
+    for (let i = 0; i < ids.length && !done; i += 25) {
+      const metas = await Promise.all(ids.slice(i, i + 25).map((id) => gmail.users.messages.get({ userId: "me", id, format: "minimal" })));
+      for (const meta of metas) {
+        scanned++;
+        if (Number(meta.data.internalDate ?? 0) < since) { done = true; break; }
+        if (meta.data.threadId) threadSet.add(meta.data.threadId);
+      }
+      if (scanned >= 400) done = true;
     }
     pageToken = r.data.nextPageToken ?? undefined;
-  } while (pageToken);
+  } while (pageToken && !done);
   const threads = [...threadSet];
 
+  type ThreadRes = { data: { messages?: { internalDate?: string | null; payload?: { headers?: { name?: string | null; value?: string | null }[] } }[] } };
+  const fetched = new Map<string, ThreadRes>();
+  for (let i = 0; i < threads.length; i += 20) {
+    const batch = threads.slice(i, i + 20);
+    (await Promise.all(batch.map((id) => gmail.users.threads.get({ userId: "me", id, format: "metadata", metadataHeaders: ["From", "To", "Cc", "Subject"] }))))
+      .forEach((t, j) => fetched.set(batch[j], t as unknown as ThreadRes));
+  }
   for (const id of threads) {
-    const t = await gmail.users.threads.get({ userId: "me", id, format: "metadata", metadataHeaders: ["From", "To", "Cc", "Subject"] });
+    const t = fetched.get(id)!;
     const msgs = t.data.messages ?? [];
     const senders = new Set<string>();
     const names = new Map<string, string | null>();

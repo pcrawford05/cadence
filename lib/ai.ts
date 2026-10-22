@@ -71,7 +71,7 @@ async function callGemini(prompt: string): Promise<unknown[]> {
     body: JSON.stringify({
       systemInstruction: { parts: [{ text: SYSTEM }] },
       contents: [{ role: "user", parts: [{ text: prompt }] }],
-      generationConfig: { responseMimeType: "application/json", responseSchema: SCHEMA, temperature: 0.2 },
+      generationConfig: { responseMimeType: "application/json", responseSchema: SCHEMA, temperature: 0.2, thinkingConfig: { thinkingBudget: 0 } },
     }),
     signal: AbortSignal.timeout(45_000),
   });
@@ -145,15 +145,25 @@ export async function draftsFromSignals(signals: SignalInput[], contacts: Contac
   if (!signals.length) return [];
   const today = localDay(new Date().toISOString(), tz);
   if (!aiEnabled()) return heuristic(signals, contacts, tz);
+  // Small parallel batches: each call returns in a few seconds instead of one long call.
+  const CHUNK = 8;
+  const batches: Promise<unknown[]>[] = [];
+  for (let start = 0; start < signals.length; start += CHUNK) {
+    const part = signals.slice(start, start + CHUNK);
+    batches.push(callGemini(promptFor(part, start, contacts, tz, today)));
+  }
+  return clean((await Promise.all(batches)).flat(), contacts, signals.length, today);
+}
+
+function promptFor(signals: SignalInput[], offset: number, contacts: Contact[], tz: string, today: string) {
   const emails = new Set(signals.flatMap((s) => s.participants.map((p) => p.email ?? "")).filter(Boolean));
-  const items = signals.map((s, i) => [
-    `[${i}] ${s.source} · ${localDay(s.occurred_at, tz)}`,
+  const items = signals.map((s, j) => [
+    `[${offset + j}] ${s.source} · ${localDay(s.occurred_at, tz)}`,
     `title: ${s.title ?? "(none)"}`,
     s.detail ? `detail: ${s.detail}` : null,
     `with: ${s.participants.map((p) => [p.name, p.email].filter(Boolean).join(" ")).join("; ") || "(no guests listed)"}`,
   ].filter(Boolean).join("\n")).join("\n\n");
-  const prompt = `Today: ${today}\n\nDirectory (id | name | emails | role):\n${directory(contacts, emails)}\n\nItems from the user's calendar and email:\n${items}\n\nPropose entries to log.`;
-  return clean(await callGemini(prompt), contacts, signals.length, today);
+  return `Today: ${today}\n\nDirectory (id | name | emails | role):\n${directory(contacts, emails)}\n\nItems from the user's calendar and email:\n${items}\n\nPropose entries to log.`;
 }
 
 /** "I texted Mia about the hackathon yesterday" -> drafts. */

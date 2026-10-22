@@ -17,8 +17,8 @@ function mockGemini(entries: unknown[]) {
 }
 
 describe("Gemini output is validated", () => {
-  beforeEach(() => { process.env.GEMINI_API_KEY = "test"; });
-  afterEach(() => { vi.unstubAllGlobals(); delete process.env.GEMINI_API_KEY; });
+  beforeEach(() => { process.env.GEMINI_API_KEY = "test"; process.env.GEMINI_MODEL = "test-model"; });
+  afterEach(() => { vi.unstubAllGlobals(); delete process.env.GEMINI_API_KEY; delete process.env.GEMINI_MODEL; });
 
   it("keeps real ids, drops invented ids, maps new people with known emails", async () => {
     const f = mockGemini([

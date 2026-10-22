@@ -20,7 +20,25 @@ export interface SignalInput {
   participants: { email: string | null; name: string | null }[];
 }
 
-const MODEL = () => process.env.GEMINI_MODEL || "gemini-2.5-flash";
+const BASE = "https://generativelanguage.googleapis.com/v1beta";
+let resolved: string | null = null;
+
+/** Newest generally available Flash model this key can use (Google retires names often). */
+async function pickModel(): Promise<string> {
+  if (process.env.GEMINI_MODEL) return process.env.GEMINI_MODEL;
+  if (resolved) return resolved;
+  const r = await fetch(`${BASE}/models?pageSize=200`, { headers: { "x-goog-api-key": process.env.GEMINI_API_KEY! } });
+  if (!r.ok) throw new Error(`Gemini error ${r.status} listing models`);
+  const { models = [] } = (await r.json()) as { models?: { name: string; supportedGenerationMethods?: string[] }[] };
+  const ver = (n: string) => Number(n.match(/gemini-(\d+(?:\.\d+)?)/)?.[1] ?? 0);
+  const ok = models
+    .map((m) => ({ id: m.name.replace(/^models\//, ""), gen: m.supportedGenerationMethods ?? [] }))
+    .filter((m) => m.gen.includes("generateContent") && /^gemini-[\d.]+-flash$|^gemini-[\d.]+-flash-latest$|^gemini-flash-latest$/.test(m.id))
+    .sort((a, b) => ver(b.id) - ver(a.id));
+  const fallback = models.map((m) => m.name.replace(/^models\//, "")).find((id) => /flash/.test(id) && !/lite|image|tts|live|audio|preview|exp/.test(id));
+  resolved = ok[0]?.id ?? fallback ?? "gemini-flash-latest";
+  return resolved;
+}
 export const aiEnabled = () => !!process.env.GEMINI_API_KEY;
 
 const SCHEMA = {
@@ -64,21 +82,25 @@ Rules:
 - Confidence: about 0.9 for a 1:1 calendar meeting or a named coffee/call; about 0.6 for an email thread; below 0.4 for ambiguous items.
 - Dates are local dates (YYYY-MM-DD). For free text, resolve words like "yesterday" relative to Today.`;
 
-async function callGemini(prompt: string): Promise<unknown[]> {
-  const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${MODEL()}:generateContent`, {
+async function callGemini(prompt: string, retried = false): Promise<unknown[]> {
+  const model = await pickModel();
+  const legacy = /gemini-2\./.test(model); // 2.x takes a thinking budget; newer models choose their own
+  const r = await fetch(`${BASE}/models/${model}:generateContent`, {
     method: "POST",
     headers: { "content-type": "application/json", "x-goog-api-key": process.env.GEMINI_API_KEY! },
     body: JSON.stringify({
       systemInstruction: { parts: [{ text: SYSTEM }] },
       contents: [{ role: "user", parts: [{ text: prompt }] }],
-      generationConfig: { responseMimeType: "application/json", responseSchema: SCHEMA, temperature: 0.2, thinkingConfig: { thinkingBudget: 0 } },
+      generationConfig: { responseMimeType: "application/json", responseSchema: SCHEMA, temperature: 0.2, ...(legacy ? { thinkingConfig: { thinkingBudget: 0 } } : {}) },
     }),
-    signal: AbortSignal.timeout(45_000),
+    signal: AbortSignal.timeout(50_000),
   });
   if (!r.ok) {
     const body = await r.text().catch(() => "");
     if (r.status === 429) throw new Error("Gemini's free limit was hit. Try again in a minute.");
-    throw new Error(`Gemini error ${r.status}: ${body.slice(0, 200)}`);
+    if ((r.status === 404 || r.status === 400) && !retried && !process.env.GEMINI_MODEL) { resolved = null; return callGemini(prompt, true); }
+    console.error(`[gemini] ${model} ${r.status}: ${body.slice(0, 500)}`);
+    throw new Error(`Gemini (${model}) error ${r.status}: ${body.slice(0, 160)}`);
   }
   const j = await r.json();
   const text = j?.candidates?.[0]?.content?.parts?.map((p: { text?: string }) => p.text ?? "").join("") ?? "";

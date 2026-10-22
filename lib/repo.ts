@@ -43,6 +43,7 @@ export interface Repo {
   importRows(rows: ImportRow[]): Promise<number>;
   /** Stores the image and returns the value to save in photo_url. */
   uploadPhoto(contactId: string, file: File): Promise<string>;
+  removePhoto(contactId: string): Promise<void>;
 }
 
 /*
@@ -175,6 +176,11 @@ export class SupabaseRepo implements Repo {
     if (error) throw error;
     return `storage:${path}`;
   }
+  async removePhoto(contactId: string) {
+    const path = await this.photoPath(contactId);
+    await this.updateContact(contactId, { photo_url: null });
+    if (path) await this.db.storage.from("photos").remove([path]); // ignore failure: the link is already gone
+  }
   async photoPath(contactId: string) {
     const { data } = await this.db.from("contacts").select("photo_url").eq("user_id", this.userId).eq("id", contactId).maybeSingle();
     return data?.photo_url?.startsWith("storage:") ? (data.photo_url as string).slice(8) : null;
@@ -251,6 +257,7 @@ export class DemoRepo implements Repo {
     }
     return rows.length;
   }
+  async removePhoto(id: string) { await this.updateContact(id, { photo_url: null }); }
   async uploadPhoto(_id: string, file: File) {
     const b64 = Buffer.from(await file.arrayBuffer()).toString("base64");
     return `data:${file.type};base64,${b64}`;

@@ -14,3 +14,5 @@ alter table public.feedback enable row level security;
 -- Users can submit and see their own feedback only.
 create policy own_feedback_insert on public.feedback for insert with check (user_id = auth.uid());
 create policy own_feedback_select on public.feedback for select using (user_id = auth.uid());
+-- Lets the app mark a submission as emailed after sending.
+create policy own_feedback_update on public.feedback for update using (user_id = auth.uid()) with check (user_id = auth.uid());

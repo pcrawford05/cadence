@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { setPhoto } from "@/app/actions";
+import { removePhoto, setPhoto } from "@/app/actions";
 import { TYPE_META, type ContactType } from "@/lib/types";
 
 /** Shrink to a 512px square-ish JPEG so storage stays small and loads fast. */
@@ -94,10 +94,22 @@ export default function PhotoDrop({
     }
   }
 
+  function remove(e: React.MouseEvent) {
+    e.stopPropagation();
+    const prev = preview;
+    setPreview(null);
+    setMsg("");
+    start(async () => {
+      try { await removePhoto(id); router.refresh(); }
+      catch { setPreview(prev); setMsg("Couldn't remove the photo. Try again."); }
+    });
+  }
+
   const initials = name.split(/\s+/).filter(Boolean).slice(0, 2).map((p) => p[0]!.toUpperCase()).join("");
 
   return (
     <div className="flex flex-col items-center gap-1.5">
+      <div className="group/photo relative">
       <button
         type="button"
         tabIndex={0}
@@ -128,6 +140,19 @@ export default function PhotoDrop({
           </div>
         </div>
       </button>
+      {preview && !pending && (
+        <button
+          type="button"
+          onClick={remove}
+          aria-label={`Remove photo for ${name}`}
+          title="Remove photo"
+          className="absolute right-0 top-0 z-10 flex h-7 w-7 items-center justify-center rounded-full border border-line bg-card text-sm text-muted shadow-md transition hover:border-red-500/40 hover:text-red-600 focus-visible:opacity-100 sm:opacity-0 sm:group-hover/photo:opacity-100"
+          style={{ transform: `translate(${size >= 96 ? "-6px, 6px" : "2px, -2px"})` }}
+        >
+          ✕
+        </button>
+      )}
+      </div>
       <button type="button" onClick={pasteButton} disabled={pending} className="text-[11px] font-medium text-muted underline-offset-2 hover:text-ink hover:underline">
         {preview ? "Paste new photo" : "Paste photo"}
       </button>

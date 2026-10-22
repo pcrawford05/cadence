@@ -306,3 +306,12 @@ export async function sendFeedback(input: { kind: string; message: string; page:
   }
   return { ok: true };
 }
+
+/** Remove a contact's photo (and delete the stored file, best effort). */
+export async function removePhoto(id: string): Promise<{ error?: string }> {
+  const repo = await getRepo();
+  await repo.removePhoto(id);
+  refresh(id);
+  revalidatePath("/inbox");
+  return {};
+}

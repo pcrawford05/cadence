@@ -14,7 +14,10 @@ if (typeof window !== "undefined") {
   try { const saved = JSON.parse(localStorage.getItem(KEY) ?? "null"); if (saved?.at) state = { phase: saved.phase === "error" ? "error" : "done", msg: saved.msg ?? "", at: saved.at, pending: 0 }; } catch {}
 }
 
+const SERVER: ScanState = { phase: "idle", msg: "", at: null, pending: 0 };
+
 export const scanStore = {
+  server: () => SERVER,
   get: () => state,
   subscribe: (f: () => void) => { subs.add(f); return () => { subs.delete(f); }; },
   busy: () => state.phase === "sync" || state.phase === "draft",

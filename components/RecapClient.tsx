@@ -31,11 +31,11 @@ const ago = (iso: string) => {
 
 export default function RecapClient({ items, googleConnected, ai }: { items: RecapItem[]; googleConnected: boolean; ai: boolean; lastSync?: string | null }) {
   const router = useRouter();
-  const st = useSyncExternalStore(scanStore.subscribe, scanStore.get, scanStore.get);
+  const st = useSyncExternalStore(scanStore.subscribe, scanStore.get, scanStore.server);
   const scan = st.phase;
   const scanMsg = st.msg;
   const checkedAt = st.at;
-  const busy = scanStore.busy();
+  const busy = scan === "sync" || scan === "draft";
   const [text, setText] = useState("");
   const [textErr, setTextErr] = useState("");
   const [pending, start] = useTransition();
@@ -60,7 +60,7 @@ export default function RecapClient({ items, googleConnected, ai }: { items: Rec
       <div className="flex flex-wrap items-center gap-3 text-sm">
         {googleConnected ? (
           <>
-            <div aria-live="polite" className="glass-thin flex items-center gap-2.5 rounded-full py-1.5 pl-3 pr-1.5">
+            <div aria-live="polite" className="glass-thin flex max-w-full items-center gap-2.5 whitespace-nowrap rounded-full py-1.5 pl-3 pr-1.5">
               {busy ? (
                 <>
                   <span className="relative flex h-2.5 w-2.5"><span className="absolute inset-0 animate-ping rounded-full bg-accent/50" /><span className="relative h-2.5 w-2.5 rounded-full bg-accent" /></span>
@@ -69,7 +69,7 @@ export default function RecapClient({ items, googleConnected, ai }: { items: Rec
                 </>
               ) : (
                 <span className={scan === "error" ? "text-red-600" : "text-muted"}>
-                  {scan === "error" ? scanMsg : scan === "done" ? `${scanMsg}. Checked ${checkedAt ? ago(checkedAt) : "just now"}` : checkedAt ? `Checked ${ago(checkedAt)}` : "Not checked yet"}
+                  {scan === "error" ? scanMsg : scan === "done" ? `${scanMsg} · ${checkedAt ? ago(checkedAt) : "just now"}` : checkedAt ? `Checked ${ago(checkedAt)}` : "Not checked yet"}
                 </span>
               )}
               <button onClick={runScan} disabled={busy} className="btn-ghost py-1 text-xs">{busy ? "Working" : scan === "error" ? "Try again" : "Check now"}</button>
@@ -170,7 +170,7 @@ function Card({ item, onDone }: { item: RecapItem; onDone: (m: string) => void }
   if (gone) return <div className="rounded-3xl border border-line bg-card px-5 py-3 text-sm text-muted">{gone === "logged" ? `✓ Logged ${name}` : `Dismissed ${name}`}</div>;
 
   return (
-    <article className={`rounded-3xl border bg-card p-4 sm:p-5 ${low ? "border-dashed border-line" : "border-line"}`}>
+    <article className={`card-in rounded-3xl border bg-card p-4 sm:p-5 ${low ? "border-dashed border-line" : "border-line"}`}>
       <div className="flex items-start gap-4">
         {p.kind === "existing" ? (
           <Link href={`/contacts/${p.id}`}><Avatar c={{ name: p.name, photo_url: p.photo, type: p.type }} size={56} /></Link>
@@ -185,7 +185,7 @@ function Card({ item, onDone }: { item: RecapItem; onDone: (m: string) => void }
               <Link href={`/contacts/${p.id}`} className="text-lg font-semibold hover:underline">{p.name}</Link>
             ) : (
               <>
-                <input value={name} onChange={(e) => setName(e.target.value)} className="rounded-lg border border-line bg-paper px-2 py-0.5 text-lg font-semibold outline-none focus:border-accent" aria-label="Name" />
+                <input value={name} onChange={(e) => setName(e.target.value)} className="min-w-0 max-w-full flex-1 rounded-lg border border-transparent bg-transparent px-1 py-0.5 text-lg font-semibold outline-none hover:border-line focus:border-accent" aria-label="Name" />
                 <span className="rounded-full bg-accent/10 px-2 py-0.5 text-[11px] font-semibold text-accent">New to Cadence</span>
               </>
             )}

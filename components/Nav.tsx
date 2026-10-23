@@ -45,11 +45,12 @@ export default function Nav() {
   const router = useRouter();
   const [mini, setMini] = useState(false);
   const [drag, setDrag] = useState<number | null>(null); // index under the finger while swiping the tab bar
+  const [dragX, setDragX] = useState<number | null>(null); // finger x within the bar, for the liquid lens
 
   // Start the day's recap as soon as the app opens, so Recap is ready when you get there.
   useEffect(() => { if (path === "/login") return; scanStore.count(); if (scanStore.due()) scanStore.run(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { if (path !== "/login") scanStore.count(); }, [path]);
-  const recap = useSyncExternalStore(scanStore.subscribe, scanStore.get, scanStore.get);
+  const recap = useSyncExternalStore(scanStore.subscribe, scanStore.get, scanStore.server);
   const badge = (href: string) => href === "/recap" && recap.pending > 0
     ? <span aria-label={`${recap.pending} to review`} className="badge-pop absolute -right-1 -top-1 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-semibold leading-none text-white shadow-sm">{recap.pending > 9 ? "9+" : recap.pending}</span>
     : null;
@@ -61,10 +62,13 @@ export default function Nav() {
     return best;
   };
   const dragBox = (() => {
-    if (drag == null) return null;
-    const el = bottom.ref.current?.querySelectorAll<HTMLElement>("a[data-tab]")[drag];
-    return el ? { left: el.offsetLeft, width: el.offsetWidth } : null;
+    if (drag == null || dragX == null || !bottom.ref.current) return null;
+    const el = bottom.ref.current.querySelectorAll<HTMLElement>("a[data-tab]")[drag];
+    if (!el) return null;
+    const w = el.offsetWidth, max = bottom.ref.current.clientWidth - w - 4;
+    return { left: Math.max(4, Math.min(max, dragX - w / 2)), width: w };
   })();
+  const relX = (clientX: number) => clientX - (bottom.ref.current?.getBoundingClientRect().left ?? 0);
   const [scrolled, setScrolled] = useState(false);
 
   useEffect(() => {
@@ -78,6 +82,13 @@ export default function Nav() {
     return () => removeEventListener("scroll", onScroll);
   }, []);
   useEffect(() => { setMini(false); }, [path]);
+  // Page transitions only after the first interaction, so the initial paint never fades in.
+  useEffect(() => {
+    const on = () => { document.documentElement.dataset.navigated = "1"; };
+    addEventListener("pointerdown", on, { once: true, capture: true });
+    addEventListener("keydown", on, { once: true, capture: true });
+    return () => { removeEventListener("pointerdown", on, true); removeEventListener("keydown", on, true); };
+  }, []);
   // Labels change width when the pill shrinks; re-measure after it settles.
   useEffect(() => { const t = setTimeout(bottom.measure, 320); return () => clearTimeout(t); }, [mini]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -110,13 +121,13 @@ export default function Nav() {
           data-mini={mini && drag == null}
           className="tabbar glass pointer-events-auto relative flex touch-none select-none rounded-full p-1"
           style={{ transformOrigin: "50% 100%", transform: drag != null ? "scale(1.04)" : undefined }}
-          onPointerDown={(e) => { setMini(false); setDrag(tabAt(e.clientX)); (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId); }}
-          onPointerMove={(e) => { if (drag != null) { const i = tabAt(e.clientX); if (i !== drag) { setDrag(i); navigator.vibrate?.(5); } } }}
-          onPointerUp={() => { if (drag != null) { const href = items[drag].href; setDrag(null); if (!active(href)) router.push(href); } }}
-          onPointerCancel={() => setDrag(null)}
+          onPointerDown={(e) => { setMini(false); setDrag(tabAt(e.clientX)); setDragX(relX(e.clientX)); (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId); }}
+          onPointerMove={(e) => { if (drag != null) { setDragX(relX(e.clientX)); const i = tabAt(e.clientX); if (i !== drag) { setDrag(i); navigator.vibrate?.(5); } } }}
+          onPointerUp={() => { if (drag != null) { const href = items[drag].href; setDrag(null); setDragX(null); if (!active(href)) router.push(href); } }}
+          onPointerCancel={() => { setDrag(null); setDragX(null); }}
           onClick={(e) => { if (e.detail) e.preventDefault(); }}
         >
-          {(dragBox ?? bottom.box) && <span aria-hidden className={`tab-active-dot absolute inset-y-1 rounded-full ${drag != null ? "bg-ink/[.14] dark:bg-white/20" : "bg-ink/[.08] dark:bg-white/10"}`} style={{ left: (dragBox ?? bottom.box)!.left, width: (dragBox ?? bottom.box)!.width }} />}
+          {(dragBox ?? bottom.box) && <span aria-hidden className={`absolute inset-y-1 rounded-full ${drag != null ? "tab-lens" : "tab-active-dot bg-ink/[.08] dark:bg-white/10"}`} style={{ left: (dragBox ?? bottom.box)!.left, width: (dragBox ?? bottom.box)!.width }} />}
           {items.map((i) => (
             <Link key={i.href} href={i.href} data-tab data-active={active(i.href)} aria-current={active(i.href) ? "page" : undefined} draggable={false}
               className={`relative flex w-[54px] flex-col items-center justify-center gap-0.5 rounded-full py-1.5 text-[10px] font-medium transition-colors ${(drag != null ? drag === items.indexOf(i) : active(i.href)) ? "text-accent" : "text-ink/70"}`}>

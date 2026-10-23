@@ -1,4 +1,5 @@
 import Link from "next/link";
+import ChipRow from "@/components/ChipRow";
 import { getRepo } from "@/lib/session";
 import { computeDue } from "@/lib/cadence";
 import { PageHeader, relDays, sinceText } from "@/components/ui";
@@ -63,24 +64,26 @@ export default async function PeoplePage({ searchParams }: { searchParams: SP })
         <input id="people-search" name="q" defaultValue={sp.q} placeholder="Search name, company, notes   ( / )" className="input max-w-md rounded-full px-4" />
       </form>
 
-      <div className="mb-6 flex flex-wrap gap-2">
+      <ChipRow className="mb-2">
         {TYPES.map((t) => (
-          <Link key={t} href={href({ type: sp.type === t ? undefined : t })} className={`chip ${sp.type === t ? "!border-ink" : ""}`}>
+          <Link key={t} data-on={sp.type === t} href={href({ type: sp.type === t ? undefined : t })} className={`chip ${sp.type === t ? "!border-ink" : ""}`}>
             <span className="h-2.5 w-2.5 rounded-full" style={{ background: TYPE_META[t].hex }} />
             {TYPE_META[t].label}
           </Link>
         ))}
         <span className="mx-1 w-px self-stretch bg-line" />
         {STATUSES.map((s) => (
-          <Link key={s} href={href({ status: sp.status === s ? undefined : s })} className={`chip capitalize ${sp.status === s ? "!border-ink" : ""}`}>{s}</Link>
+          <Link key={s} data-on={sp.status === s} href={href({ status: sp.status === s ? undefined : s })} className={`chip capitalize ${sp.status === s ? "!border-ink" : ""}`}>{s}</Link>
         ))}
         <span className="mx-1 w-px self-stretch bg-line" />
-        <Link href={href({ unsorted: sp.unsorted ? undefined : "1" })} className={`chip ${sp.unsorted ? "!border-ink" : ""}`}>Unsorted ({unsortedCount})</Link>
-        <span className="mx-1 w-px self-stretch bg-line" />
+        <Link data-on={!!sp.unsorted} href={href({ unsorted: sp.unsorted ? undefined : "1" })} className={`chip ${sp.unsorted ? "!border-ink" : ""}`}>Unsorted ({unsortedCount})</Link>
+      </ChipRow>
+      <ChipRow className="mb-6">
+        <span className="self-center pr-1 text-xs text-muted">Sort</span>
         {[["", "A to Z"], ["due", "Most overdue"], ["recent", "Recently talked"], ["strength", "Strongest"]].map(([k, l]) => (
-          <Link key={k} href={href({ sort: k || undefined })} className={`chip ${(sp.sort ?? "") === k ? "!border-ink" : ""}`}>{l}</Link>
+          <Link key={k} data-on={(sp.sort ?? "") === k} href={href({ sort: k || undefined })} className={`chip ${(sp.sort ?? "") === k ? "!border-ink bg-ink text-paper" : ""}`}>{l}</Link>
         ))}
-      </div>
+      </ChipRow>
 
       <PeopleGrid
         items={visible.map(({ c, d }) => {

@@ -21,6 +21,7 @@ export default function InboxCard({ c, connected }: Props) {
     const fd = new FormData(form);
     setLeaving(kind);
     start(async () => {
+      await new Promise((r) => setTimeout(r, 820)); // let the fold finish before the list re-renders
       try { kind === "saved" ? await triage(c.id, fd) : await archiveFromInbox(c.id); }
       catch { setLeaving(""); }
     });
@@ -31,7 +32,7 @@ export default function InboxCard({ c, connected }: Props) {
       <div className="min-h-0 overflow-hidden">
         <article className="relative mb-4 rounded-3xl border border-line bg-card p-5">
           {leaving && (
-            <div className="inbox-stamp absolute inset-0 z-10 flex items-center justify-center rounded-3xl bg-card/80 text-sm font-medium text-accent">
+            <div className="inbox-stamp absolute inset-0 z-10 flex items-center justify-center gap-2 rounded-3xl bg-card text-base font-semibold text-accent">
               {leaving === "saved" ? `✓ ${c.name} sorted` : `${c.name} archived`}
             </div>
           )}

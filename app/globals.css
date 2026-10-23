@@ -130,15 +130,15 @@ html[data-splash] #splash {
   background: rgb(var(--paper));
 }
 html[data-splash] body { overflow: hidden; }
-html[data-splash="out"] #splash { animation: splash-out 500ms var(--ease-out) forwards; }
+html[data-splash="out"] #splash { animation: splash-out 700ms var(--ease-out) forwards; }
 .splash-mark { width: 156px; height: 156px; overflow: visible; }
 .splash-ring {
   fill: none; stroke-width: 7; stroke-linecap: round; stroke-dasharray: 0 100;
   transform-origin: 60px 60px; transform: rotate(calc(var(--rot) - 140deg));
-  animation: ring-draw 1000ms var(--spring) calc(var(--i) * 90ms) forwards, ring-breathe 1600ms ease-in-out 1200ms infinite alternate;
+  animation: ring-draw 1500ms var(--spring) calc(var(--i) * 150ms) forwards, ring-breathe 1800ms ease-in-out 1900ms infinite alternate;
 }
-.splash-dot { fill: rgb(var(--ink)); transform-origin: 60px 60px; transform: scale(0); animation: dot-in 500ms var(--spring) 650ms forwards; }
-.splash-word { font-family: ui-serif, "Iowan Old Style", Palatino, Georgia, serif; font-size: 22px; font-weight: 600; letter-spacing: -.01em; opacity: 0; animation: word-in 500ms var(--ease-out) 800ms forwards; }
+.splash-dot { fill: rgb(var(--ink)); transform-origin: 60px 60px; transform: scale(0); animation: dot-in 700ms var(--spring) 1000ms forwards; }
+.splash-word { font-family: ui-serif, "Iowan Old Style", Palatino, Georgia, serif; font-size: 22px; font-weight: 600; letter-spacing: -.01em; opacity: 0; animation: word-in 700ms var(--ease-out) 1200ms forwards; }
 @keyframes ring-draw { to { stroke-dasharray: 22 100; transform: rotate(var(--rot)); } }
 @keyframes ring-breathe { to { stroke-dasharray: 30 100; } }
 @keyframes dot-in { to { transform: scale(1); } }
@@ -156,9 +156,27 @@ html[data-splash="out"] #splash { animation: splash-out 500ms var(--ease-out) fo
 
 ::view-transition-old(root), ::view-transition-new(root) { animation-duration: 180ms; }
 
+/* Reduce Motion: nothing moves, scales, or spins. Everything that animated becomes a gentle cross-fade,
+   matching iOS when Reduce Motion and Prefer Cross-Fade Transitions are on. */
 @media (prefers-reduced-motion: reduce) {
-  *, *::before, *::after { animation-duration: 1ms !important; transition-duration: 1ms !important; }
+  *, *::before, *::after { transition-property: opacity, color, background-color, border-color !important; }
+  .sheet, .pop, .card-in, .page-in, .scrim, .inbox-stamp, .badge-pop { animation: fade-in 280ms ease-out both !important; }
+  html:not([data-navigated]) .page-in { animation: none !important; }
+  .tabbar, .tabbar[data-mini="true"] { transform: none !important; }
+  .tab-lens { transform: none; }
+  .inbox-row { transition: grid-template-rows 1ms linear 600ms, opacity 500ms ease-out !important; }
+  button:not(:disabled):active, a.chip:active, .btn:active { transform: none; opacity: .7; }
+  .animate-ping, .animate-pulse { animation: none !important; }
+
+  /* Launch: the finished mark fades up ring by ring, then the wordmark; no drawing or rotation. */
+  .splash-ring { stroke-dasharray: 22 100; transform: rotate(var(--rot)); opacity: 0;
+    animation: rm-fade 600ms ease-out calc(200ms + var(--i) * 160ms) forwards !important; }
+  .splash-dot { transform: none; opacity: 0; animation: rm-fade 500ms ease-out 850ms forwards !important; }
+  .splash-word { transform: none; animation: rm-fade 600ms ease-out 1000ms forwards !important; }
+  html[data-splash="out"] #splash { animation: rm-out 650ms ease-in-out forwards !important; }
 }
+@keyframes rm-fade { from { opacity: 0 } to { opacity: 1 } }
+@keyframes rm-out { to { opacity: 0; visibility: hidden } }
 
 :focus-visible { outline: 2px solid rgb(var(--accent)); outline-offset: 2px; }
 

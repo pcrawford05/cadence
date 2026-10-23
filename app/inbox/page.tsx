@@ -11,9 +11,10 @@ const fmt = (d: string | null) => (d ? new Date(d + "T12:00:00Z").toLocaleDateSt
 export default async function InboxPage({ searchParams }: { searchParams: Promise<{ more?: string }> }) {
   const { more } = await searchParams;
   const repo = await getRepo();
-  const [contacts, settings] = await Promise.all([repo.listContacts(), repo.getSettings()]);
+  const [contacts, settings] = await Promise.all([repo.listContactsBare(), repo.getSettings()]);
   const extra = Math.max(0, Number(more ?? 0));
-  const info = inboxBatch(contacts, new Date(), settings.inbox_daily, settings.timezone, extra);
+  const info0 = inboxBatch(contacts, new Date(), settings.inbox_daily, settings.timezone, extra);
+  const info = { ...info0, batch: await repo.withPhotos(info0.batch) };
 
   if (info.remaining === 0) {
     return (

@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import Nav from "@/components/Nav";
 import Shortcuts from "@/components/Shortcuts";
 import Feedback from "@/components/Feedback";
+import Splash from "@/components/Splash";
 import { isDemo } from "@/lib/supabase";
 import "./globals.css";
 
@@ -25,8 +26,13 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
+      <head>
+        {/* Cold open only: decide before first paint so the app never flashes behind the splash. */}
+        <script dangerouslySetInnerHTML={{ __html: `try{if(!sessionStorage.getItem('cadence.launched')&&location.pathname!=='/login')document.documentElement.setAttribute('data-splash','')}catch(e){}` }} />
+      </head>
       <body className="min-h-screen font-sans">
+        <Splash />
         {isDemo() && (
           <div className="bg-accent/10 py-1 text-center text-xs text-accent">Demo mode: sample data, nothing is saved</div>
         )}

@@ -9,8 +9,16 @@ export const dynamic = "force-dynamic";
 
 export default async function DuePage() {
   const repo = await getRepo();
-  const [contacts, settings] = await Promise.all([repo.listContacts(), repo.getSettings()]);
+  const [bare, settings] = await Promise.all([repo.listContactsBare(), repo.getSettings()]);
   const now = new Date();
+  // Sign photos only for the people this page shows.
+  const shown = new Set([
+    ...dueList(bare, now, settings.cadence).map((x) => x.contact.id),
+    ...bare.filter((c) => { const d = computeDue(c, now, settings.cadence).daysOverdue; return d != null && d < 0 && d >= -14; }).map((c) => c.id),
+    ...bare.filter((c) => c.statuses.includes("new") && !c.last_contact_at && !c.date_met).map((c) => c.id),
+  ]);
+  const signed = new Map((await repo.withPhotos(bare.filter((c) => shown.has(c.id)))).map((c) => [c.id, c]));
+  const contacts = bare.map((c) => signed.get(c.id) ?? c);
   const due = dueList(contacts, now, settings.cadence);
   const upcoming = contacts
     .map((c) => ({ contact: c, due: computeDue(c, now, settings.cadence) }))

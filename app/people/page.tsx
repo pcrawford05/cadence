@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { headers } from "next/headers";
 import ChipRow from "@/components/ChipRow";
 import { getRepo } from "@/lib/session";
 import { computeDue } from "@/lib/cadence";
@@ -9,12 +10,27 @@ import { STATUSES, TYPES, TYPE_META } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
-type SP = Promise<{ q?: string; type?: string; status?: string; sort?: string; unsorted?: string; page?: string }>;
+type SP = Promise<{ q?: string; type?: string; status?: string; sort?: string; unsorted?: string; page?: string; seed?: string }>;
 
-const PAGE_SIZE = 60; // divides evenly into 2, 3, and 5 columns
+// Phones get a small, shuffled handful (sparks ideas, loads instantly); desktop gets a fuller grid.
+const PAGE_MOBILE = 12;
+const PAGE_DESKTOP = 30;
+
+/** Deterministic shuffle so paging through one shuffle never repeats or skips anyone. */
+function shuffle<T>(arr: T[], seed: number) {
+  const a = [...arr];
+  let s = seed >>> 0 || 1;
+  const rnd = () => ((s = (s * 1664525 + 1013904223) >>> 0) / 2 ** 32);
+  for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; }
+  return a;
+}
 
 export default async function PeoplePage({ searchParams }: { searchParams: SP }) {
-  const sp = await searchParams;
+  const sp = { ...(await searchParams) };
+  const mobile = /iPhone|Android.+Mobile|Mobile Safari/i.test((await headers()).get("user-agent") ?? "");
+  const PAGE_SIZE = mobile ? PAGE_MOBILE : PAGE_DESKTOP;
+  // No sort chosen means shuffle. A fresh seed per visit; paging and filters carry it.
+  if (!sp.sort && !sp.seed) sp.seed = String(Math.floor(Math.random() * 1e9));
   const repo = await getRepo();
   const [all, settings] = await Promise.all([repo.listContactsBare(), repo.getSettings()]);
   const q = (sp.q ?? "").toLowerCase();
@@ -28,6 +44,8 @@ export default async function PeoplePage({ searchParams }: { searchParams: SP })
     .filter((c) => !q || [c.name, c.company, c.position, c.location, c.notes].some((v) => v?.toLowerCase().includes(q)))
     .map((c) => ({ c, d: computeDue(c, now, settings.cadence) }));
 
+  if (!sp.sort) list = shuffle(list, Number(sp.seed));
+  if (sp.sort === "az") list = list.sort((a, b) => a.c.name.localeCompare(b.c.name));
   if (sp.sort === "due") list = list.sort((a, b) => (b.d.daysOverdue ?? -1e9) - (a.d.daysOverdue ?? -1e9));
   if (sp.sort === "strength") list = list.sort((a, b) => (b.c.strength ?? 0) - (a.c.strength ?? 0));
   if (sp.sort === "recent") list = list.sort((a, b) => (b.c.last_contact_at ?? "").localeCompare(a.c.last_contact_at ?? ""));
@@ -80,8 +98,8 @@ export default async function PeoplePage({ searchParams }: { searchParams: SP })
       </ChipRow>
       <ChipRow className="mb-6">
         <span className="self-center pr-1 text-xs text-muted">Sort</span>
-        {[["", "A to Z"], ["due", "Most overdue"], ["recent", "Recently talked"], ["strength", "Strongest"]].map(([k, l]) => (
-          <Link key={k} data-on={(sp.sort ?? "") === k} href={href({ sort: k || undefined })} className={`chip ${(sp.sort ?? "") === k ? "!border-ink bg-ink text-paper" : ""}`}>{l}</Link>
+        {[["", "Shuffle"], ["az", "A to Z"], ["due", "Most overdue"], ["recent", "Recently talked"], ["strength", "Strongest"]].map(([k, l]) => (
+          <Link key={k} data-on={(sp.sort ?? "") === k} href={href({ sort: k || undefined, seed: k ? undefined : String(Math.floor(Math.random() * 1e9)) })} className={`chip ${(sp.sort ?? "") === k ? "!border-ink bg-ink text-paper" : ""}`}>{l}</Link>
         ))}
       </ChipRow>
 

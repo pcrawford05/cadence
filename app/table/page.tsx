@@ -5,7 +5,7 @@ import { Avatar, ContactLink, PageHeader, StatusPills, TypeDot, relDays } from "
 import { StrengthBadge } from "@/components/Strength";
 import Pager, { paginate } from "@/components/Pager";
 
-const PAGE_SIZE = 50;
+const PAGE_SIZE = 20;
 
 export const dynamic = "force-dynamic";
 

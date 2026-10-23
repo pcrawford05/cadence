@@ -123,6 +123,31 @@ button:not(:disabled):active, a.chip:active, .btn:active { transform: scale(.96)
 html:not([data-navigated]) .page-in { animation: none; } /* first paint: no fade, no flash */
 @keyframes page-in { from { opacity: 0; transform: translateY(6px) } }
 
+/* Launch screen: four concentric rings draw in, sweep into the app-icon arcs, then lift away. */
+#splash { display: none; }
+html[data-splash] #splash {
+  display: flex; position: fixed; inset: 0; z-index: 100; flex-direction: column; align-items: center; justify-content: center; gap: 18px;
+  background: rgb(var(--paper));
+}
+html[data-splash] body { overflow: hidden; }
+html[data-splash="out"] #splash { animation: splash-out 500ms var(--ease-out) forwards; }
+.splash-mark { width: 156px; height: 156px; overflow: visible; }
+.splash-ring {
+  fill: none; stroke-width: 7; stroke-linecap: round; stroke-dasharray: 0 100;
+  transform-origin: 60px 60px; transform: rotate(calc(var(--rot) - 140deg));
+  animation: ring-draw 1000ms var(--spring) calc(var(--i) * 90ms) forwards, ring-breathe 1600ms ease-in-out 1200ms infinite alternate;
+}
+.splash-dot { fill: rgb(var(--ink)); transform-origin: 60px 60px; transform: scale(0); animation: dot-in 500ms var(--spring) 650ms forwards; }
+.splash-word { font-family: ui-serif, "Iowan Old Style", Palatino, Georgia, serif; font-size: 22px; font-weight: 600; letter-spacing: -.01em; opacity: 0; animation: word-in 500ms var(--ease-out) 800ms forwards; }
+@keyframes ring-draw { to { stroke-dasharray: 22 100; transform: rotate(var(--rot)); } }
+@keyframes ring-breathe { to { stroke-dasharray: 30 100; } }
+@keyframes dot-in { to { transform: scale(1); } }
+@keyframes word-in { from { transform: translateY(6px); } to { opacity: 1; transform: none; } }
+@keyframes splash-out { to { opacity: 0; transform: scale(1.06); visibility: hidden; } }
+
+/* Skeletons wait 160ms before showing, so quick page switches never flash a placeholder. */
+[aria-busy="true"] { animation: fade-in 220ms var(--ease-out) 160ms both; }
+
 /* Scroll-edge: content softens under the top bar instead of hard-clipping. */
 .scroll-edge::after {
   content: ""; position: absolute; inset-inline: 0; top: 100%; height: 18px; pointer-events: none;

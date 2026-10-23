@@ -20,12 +20,12 @@ export default function Splash() {
     const photos = fetch("/api/preload").then((r) => r.json()).then(({ urls }: { urls: string[] }) =>
       Promise.all(urls.map((u) => new Promise<void>((ok) => { const i = new Image(); i.decoding = "async"; i.onload = i.onerror = () => ok(); i.src = u; }))),
     ).catch(() => {});
-    const minAnim = new Promise((ok) => setTimeout(ok, matchMedia("(prefers-reduced-motion: reduce)").matches ? 1700 : 2100));
-    const cap = new Promise((ok) => setTimeout(ok, 3500));
+    const minAnim = new Promise((ok) => setTimeout(ok, 1350));
+    const cap = new Promise((ok) => setTimeout(ok, 3000));
 
     Promise.race([Promise.all([photos, minAnim]), cap]).then(() => {
       root.setAttribute("data-splash", "out");
-      setTimeout(() => root.removeAttribute("data-splash"), 720);
+      setTimeout(() => root.removeAttribute("data-splash"), 520);
       try { sessionStorage.setItem("cadence.launched", String(Math.round(performance.now() - started))); } catch {}
     });
   }, []); // eslint-disable-line react-hooks/exhaustive-deps

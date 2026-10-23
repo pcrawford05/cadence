@@ -130,15 +130,15 @@ html[data-splash] #splash {
   background: rgb(var(--paper));
 }
 html[data-splash] body { overflow: hidden; }
-html[data-splash="out"] #splash { animation: splash-out 700ms var(--ease-out) forwards; }
+html[data-splash="out"] #splash { animation: splash-out 500ms var(--ease-out) forwards; }
 .splash-mark { width: 156px; height: 156px; overflow: visible; }
 .splash-ring {
   fill: none; stroke-width: 7; stroke-linecap: round; stroke-dasharray: 0 100;
   transform-origin: 60px 60px; transform: rotate(calc(var(--rot) - 140deg));
-  animation: ring-draw 1500ms var(--spring) calc(var(--i) * 150ms) forwards, ring-breathe 1800ms ease-in-out 1900ms infinite alternate;
+  animation: ring-draw 1200ms cubic-bezier(.4, 0, .2, 1) calc(var(--i) * 50ms) forwards;
 }
-.splash-dot { fill: rgb(var(--ink)); transform-origin: 60px 60px; transform: scale(0); animation: dot-in 700ms var(--spring) 1000ms forwards; }
-.splash-word { font-family: ui-serif, "Iowan Old Style", Palatino, Georgia, serif; font-size: 22px; font-weight: 600; letter-spacing: -.01em; opacity: 0; animation: word-in 700ms var(--ease-out) 1200ms forwards; }
+.splash-dot { fill: rgb(var(--ink)); transform-origin: 60px 60px; transform: scale(0); animation: dot-in 450ms var(--spring) 800ms forwards; }
+.splash-word { font-family: ui-serif, "Iowan Old Style", Palatino, Georgia, serif; font-size: 22px; font-weight: 600; letter-spacing: -.01em; opacity: 0; animation: word-in 450ms var(--ease-out) 850ms forwards; }
 @keyframes ring-draw { to { stroke-dasharray: 22 100; transform: rotate(var(--rot)); } }
 @keyframes ring-breathe { to { stroke-dasharray: 30 100; } }
 @keyframes dot-in { to { transform: scale(1); } }
@@ -170,10 +170,10 @@ html[data-splash="out"] #splash { animation: splash-out 700ms var(--ease-out) fo
 
   /* Launch: the finished mark fades up ring by ring, then the wordmark; no drawing or rotation. */
   .splash-ring { stroke-dasharray: 22 100; transform: rotate(var(--rot)); opacity: 0;
-    animation: rm-fade 600ms ease-out calc(200ms + var(--i) * 160ms) forwards !important; }
-  .splash-dot { transform: none; opacity: 0; animation: rm-fade 500ms ease-out 850ms forwards !important; }
-  .splash-word { transform: none; animation: rm-fade 600ms ease-out 1000ms forwards !important; }
-  html[data-splash="out"] #splash { animation: rm-out 650ms ease-in-out forwards !important; }
+    animation: rm-fade 500ms ease-out calc(var(--i) * 120ms) forwards !important; }
+  .splash-dot { transform: none; opacity: 0; animation: rm-fade 400ms ease-out 600ms forwards !important; }
+  .splash-word { transform: none; animation: rm-fade 450ms ease-out 700ms forwards !important; }
+  html[data-splash="out"] #splash { animation: rm-out 500ms ease-in-out forwards !important; }
 }
 @keyframes rm-fade { from { opacity: 0 } to { opacity: 1 } }
 @keyframes rm-out { to { opacity: 0; visibility: hidden } }

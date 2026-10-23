@@ -5,6 +5,15 @@ import { adminClient, isDemo } from "@/lib/supabase";
 
 export const maxDuration = 60;
 
+/** Pending proposals, for the badge on the Recap tab. */
+export async function GET() {
+  try {
+    const store = await getRecap();
+    const n = (await store.listProposals()).filter((p) => p.status === "pending").length;
+    return NextResponse.json({ pending: n });
+  } catch { return NextResponse.json({ pending: 0 }); }
+}
+
 /**
  * Recap scan, in two steps so the page can show real progress and never holds the router.
  * (A server action would queue every navigation behind Gemini; a plain fetch does not.)
@@ -34,7 +43,8 @@ export async function POST(req: Request) {
       const { generateFromSignals } = await import("@/lib/recap");
       const added = await generateFromSignals(store, repo, settings.timezone);
       revalidatePath("/recap");
-      return NextResponse.json({ ok: true, added });
+      const pending = (await store.listProposals()).filter((p) => p.status === "pending").length;
+      return NextResponse.json({ ok: true, added, pending });
     }
     return NextResponse.json({ ok: false, error: "Unknown step" }, { status: 400 });
   } catch (e) {

@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from "react";
 import { openPalette } from "./Shortcuts";
 import { openFeedback } from "./Feedback";
 import { useRouter } from "next/navigation";
@@ -47,7 +47,12 @@ export default function Nav() {
   const [drag, setDrag] = useState<number | null>(null); // index under the finger while swiping the tab bar
 
   // Start the day's recap as soon as the app opens, so Recap is ready when you get there.
-  useEffect(() => { if (path !== "/login" && scanStore.due()) scanStore.run(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { if (path === "/login") return; scanStore.count(); if (scanStore.due()) scanStore.run(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { if (path !== "/login") scanStore.count(); }, [path]);
+  const recap = useSyncExternalStore(scanStore.subscribe, scanStore.get, scanStore.get);
+  const badge = (href: string) => href === "/recap" && recap.pending > 0
+    ? <span aria-label={`${recap.pending} to review`} className="badge-pop absolute -right-1 -top-1 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-semibold leading-none text-white shadow-sm">{recap.pending > 9 ? "9+" : recap.pending}</span>
+    : null;
 
   const tabAt = (x: number) => {
     const links = [...(bottom.ref.current?.querySelectorAll<HTMLElement>("a[data-tab]") ?? [])];
@@ -87,6 +92,7 @@ export default function Nav() {
               <Link key={i.href} href={i.href} data-active={active(i.href)} aria-current={active(i.href) ? "page" : undefined}
                 className={`relative rounded-full px-3 py-1.5 text-sm transition-colors duration-300 ${active(i.href) ? "text-paper" : "text-muted hover:text-ink"}`}>
                 {i.label}
+                {badge(i.href)}
               </Link>
             ))}
           </nav>
@@ -114,7 +120,7 @@ export default function Nav() {
           {items.map((i) => (
             <Link key={i.href} href={i.href} data-tab data-active={active(i.href)} aria-current={active(i.href) ? "page" : undefined} draggable={false}
               className={`relative flex w-[54px] flex-col items-center justify-center gap-0.5 rounded-full py-1.5 text-[10px] font-medium transition-colors ${(drag != null ? drag === items.indexOf(i) : active(i.href)) ? "text-accent" : "text-ink/70"}`}>
-              <Icon d={i.icon} />
+              <span className="relative"><Icon d={i.icon} />{badge(i.href)}</span>
               <span className="tab-label overflow-hidden">{i.label}</span>
             </Link>
           ))}

@@ -21,10 +21,10 @@ export default async function PeoplePage({ searchParams }: { searchParams: SP })
 
   const unsortedCount = all.filter((c) => !c.triaged_at).length;
   let list = all
-    .filter((c) => (sp.unsorted ? !c.triaged_at : !!c.triaged_at))
+    .filter((c) => (sp.unsorted ? !c.triaged_at : q ? true : !!c.triaged_at)) // searching covers everyone
     .filter((c) => !sp.type || c.type === sp.type)
     .filter((c) => !sp.status || c.statuses.includes(sp.status as never))
-    .filter((c) => !q || [c.name, c.company, c.location, c.notes].some((v) => v?.toLowerCase().includes(q)))
+    .filter((c) => !q || [c.name, c.company, c.position, c.location, c.notes].some((v) => v?.toLowerCase().includes(q)))
     .map((c) => ({ c, d: computeDue(c, now, settings.cadence) }));
 
   if (sp.sort === "due") list = list.sort((a, b) => (b.d.daysOverdue ?? -1e9) - (a.d.daysOverdue ?? -1e9));

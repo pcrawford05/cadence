@@ -23,6 +23,7 @@ export interface SignalInput {
 const BASE = "https://generativelanguage.googleapis.com/v1beta";
 let resolved: string | null = null;
 let ranked: string[] = [];
+let fastRanked: string[] = [];
 
 /** Newest generally available Flash model this key can use (Google retires names often). */
 async function pickModel(): Promise<string> {
@@ -40,6 +41,7 @@ async function pickModel(): Promise<string> {
   const lite = models.map((m) => m.name.replace(/^models\//, "")).filter((id) => /^gemini-[\d.]+-flash-lite$/.test(id)).sort((a, b) => ver(b) - ver(a));
   ranked = [...new Set([...ok.map((m) => m.id), ...(fallback ? [fallback] : []), ...lite])];
   resolved = ranked[0] ?? "gemini-flash-latest";
+  fastRanked = [...new Set([...lite, ...ranked])];
   return resolved;
 }
 export const aiEnabled = () => !!process.env.GEMINI_API_KEY;
@@ -85,10 +87,11 @@ Rules:
 - Confidence: about 0.9 for a 1:1 calendar meeting or a named coffee/call; about 0.6 for an email thread; below 0.4 for ambiguous items.
 - Dates are local dates (YYYY-MM-DD). For free text, resolve words like "yesterday" relative to Today.`;
 
-async function callGemini(prompt: string, retried = false, attempt = 0): Promise<unknown[]> {
+async function callGemini(prompt: string, retried = false, attempt = 0, fast = false): Promise<unknown[]> {
   const first = await pickModel();
-  // On overload, wait briefly, then walk down to the next available Flash model.
-  const model = attempt === 0 ? first : ranked[attempt - 1] ?? first;
+  // fast: Flash-Lite first, short timeouts, no waiting between models (typing in the recap box).
+  const list = fast ? fastRanked : ranked;
+  const model = fast ? (list[attempt] ?? first) : attempt === 0 ? first : list[attempt - 1] ?? first;
   const legacy = /gemini-2\./.test(model); // 2.x takes a thinking budget; newer models choose their own
   const r = await fetch(`${BASE}/models/${model}:generateContent`, {
     method: "POST",
@@ -98,17 +101,21 @@ async function callGemini(prompt: string, retried = false, attempt = 0): Promise
       contents: [{ role: "user", parts: [{ text: prompt }] }],
       generationConfig: { responseMimeType: "application/json", responseSchema: SCHEMA, temperature: 0.2, ...(legacy ? { thinkingConfig: { thinkingBudget: 0 } } : {}) },
     }),
-    signal: AbortSignal.timeout(50_000),
+    signal: AbortSignal.timeout(fast ? 6_000 : 50_000),
+  }).catch((e) => {
+    if (fast && attempt < 2) return null; // timed out: try the next model
+    throw e;
   });
+  if (!r) return callGemini(prompt, retried, attempt + 1, fast);
   if (!r.ok) {
     const body = await r.text().catch(() => "");
     console.warn(`[gemini] ${model} ${r.status}, trying next`);
-    if ((r.status === 503 || r.status === 500 || r.status === 429) && attempt < Math.min(6, ranked.length + 1)) {
-      await new Promise((ok) => setTimeout(ok, 1200));
-      return callGemini(prompt, retried, attempt + 1);
+    if ((r.status === 503 || r.status === 500 || r.status === 429) && attempt < Math.min(fast ? 2 : 6, list.length + (fast ? 0 : 1))) {
+      if (!fast) await new Promise((ok) => setTimeout(ok, 1200));
+      return callGemini(prompt, retried, attempt + 1, fast);
     }
     if (r.status === 429) throw new Error("Gemini's free limit was hit. Try again in a minute.");
-    if ((r.status === 404 || r.status === 400) && !retried && !process.env.GEMINI_MODEL) { resolved = null; return callGemini(prompt, true); }
+    if ((r.status === 404 || r.status === 400) && !retried && !process.env.GEMINI_MODEL) { resolved = null; return callGemini(prompt, true, 0, fast); }
     console.error(`[gemini] ${model} ${r.status}: ${body.slice(0, 500)}`);
     throw new Error(`Gemini (${model}) error ${r.status}: ${body.slice(0, 160)}`);
   }
@@ -122,11 +129,12 @@ async function callGemini(prompt: string, retried = false, attempt = 0): Promise
 }
 
 /** Compact directory so the model can match names without seeing everything. */
-function directory(contacts: Contact[], focusEmails: Set<string>, freeText = "") {
+function directory(contacts: Contact[], focusEmails: Set<string>, freeText = "", lean = false) {
   const words = new Set(freeText.toLowerCase().split(/[^a-z]+/).filter((w) => w.length > 2));
   const relevant = contacts.filter((c) =>
     c.emails.some((e) => focusEmails.has(e.toLowerCase())) || c.name.toLowerCase().split(/\s+/).some((p) => words.has(p)),
   );
+  if (lean) return relevant.slice(0, 40).map((c) => `${c.id} | ${c.name} | ${c.emails[0] ?? ""} | ${[c.position, c.company].filter(Boolean).join(" at ")}`).join("\n") || "(no likely matches)";
   const list = (relevant.length ? relevant : []).concat(contacts.filter((c) => !relevant.includes(c)).slice(0, Math.max(0, 400 - relevant.length)));
   return list.map((c) => `${c.id} | ${c.name} | ${c.emails.join(" ")} | ${[c.position, c.company].filter(Boolean).join(" at ")}`).join("\n");
 }
@@ -210,8 +218,15 @@ export async function draftsFromText(text: string, contacts: Contact[], tz: stri
     if (process.env.DEMO_MODE === "1") return demoParse(text, contacts, today);
     throw new Error("AI isn't set up yet. Add GEMINI_API_KEY in Vercel.");
   }
-  const prompt = `Today: ${today}\n\nDirectory (id | name | emails | role):\n${directory(contacts, new Set(), text)}\n\nThe user wrote about other conversations (texts, LinkedIn, Discord, in person):\n"""${text.slice(0, 4000)}"""\n\nPropose one entry per person mentioned. signal_index must be null. Capture any company, role, location, or how they met in new_person.`;
-  return clean(await callGemini(prompt), contacts, 0, today);
+  const prompt = `Today: ${today}\n\nDirectory, likely matches only (id | name | email | role):\n${directory(contacts, new Set(), text, true)}\n\nThe user wrote about other conversations (texts, LinkedIn, Discord, in person):\n"""${text.slice(0, 2000)}"""\n\nPropose one entry per person mentioned. signal_index must be null. Use a directory id only for a clear name match. Capture any company, role, location, or how they met in new_person.`;
+  try {
+    return clean(await callGemini(prompt, false, 0, true), contacts, 0, today);
+  } catch (e) {
+    console.warn("[gemini] text fallback:", (e as Error).message);
+    const local = localParse(text, contacts, today);
+    if (local.length) return local;
+    throw e;
+  }
 }
 
 /* ---------------- Offline fallbacks ---------------- */
@@ -237,10 +252,17 @@ function heuristic(signals: SignalInput[], contacts: Contact[], tz: string): Dra
   return out;
 }
 
-/** Demo-only: "Name ... about X" per sentence. */
+/** Offline reading of "coffee with Jordan Lee from Ramp about X", used when Gemini is slow or down. */
+function localParse(text: string, contacts: Contact[], today: string): Draft[] {
+  return demoParse(text, contacts, today);
+}
+
+/** "Name ... about X" per sentence. */
 function demoParse(text: string, contacts: Contact[], today: string): Draft[] {
   return text.split(/[.;\n]+/).map((t) => t.trim()).filter(Boolean).flatMap((sentence) => {
-    const known = contacts.find((c) => sentence.toLowerCase().includes(c.name.split(" ")[0].toLowerCase()));
+    const low = ` ${sentence.toLowerCase().replace(/[^a-z\s]/g, " ")} `;
+    const known = contacts.find((c) => c.name.trim().includes(" ") && low.includes(` ${c.name.toLowerCase()} `))
+      ?? (() => { const firsts = contacts.filter((c) => { const f = c.name.split(" ")[0].toLowerCase(); return f.length > 2 && low.includes(` ${f} `); }); return firsts.length === 1 ? firsts[0] : undefined; })();
     const m = sentence.match(/(?:with|texted|called|met|messaged|to)\s+([A-Z][a-z]+(?:\s[A-Z][a-z]+)?)(?:\s+(?:from|at)\s+([A-Z][\w&]+))?/);
     if (!known && !m) return [];
     const about = sentence.match(/about (.+)$/i)?.[1];

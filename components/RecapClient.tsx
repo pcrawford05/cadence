@@ -52,6 +52,7 @@ export default function RecapClient({ items, googleConnected, ai }: { items: Rec
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const pendingItems = items.filter((i) => i.status === "pending");
+  useEffect(() => { scanStore.setPending(pendingItems.length); }, [pendingItems.length]);
   const done = items.filter((i) => i.status !== "pending");
 
   return (

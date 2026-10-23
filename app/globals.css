@@ -83,6 +83,8 @@ body::before {
   .glass, .glass-thin { background: rgb(var(--card)); border-color: rgb(var(--ink) / .5); }
 }
 
+@keyframes badge-in { from { transform: scale(0) } }
+.badge-pop { animation: badge-in 380ms var(--spring); }
 @keyframes fade-in { from { opacity: 0 } }
 @keyframes sheet-in { from { opacity: 0; transform: translateY(24px) scale(.97) } }
 @keyframes pop-in { from { opacity: 0; transform: translateY(-8px) scale(.97) } }
@@ -98,6 +100,9 @@ body::before {
 .inbox-row { grid-template-rows: 1fr; transition: grid-template-rows 420ms var(--ease-out) 380ms, opacity 300ms var(--ease-out) 420ms; }
 .inbox-row.is-leaving { grid-template-rows: 0fr; opacity: 0; }
 .inbox-stamp { animation: fade-in 160ms var(--ease-out); }
+
+/* iOS zooms into any field under 16px and leaves the page zoomed after blur. */
+@media (max-width: 639px) { input, select, textarea { font-size: 16px !important; } }
 
 /* Scroll-edge: content softens under the top bar instead of hard-clipping. */
 .scroll-edge::after {

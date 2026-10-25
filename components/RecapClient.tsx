@@ -2,6 +2,7 @@
 import Link from "next/link";
 import { useEffect, useState, useSyncExternalStore, useTransition } from "react";
 import { scanStore } from "@/lib/scanStore";
+import { refreshBadge } from "@/lib/badgeStore";
 import { useRouter } from "next/navigation";
 import { approveAll, approveProposal, dismissProposal, recapFromText } from "@/app/actions";
 import { Avatar } from "./ui";
@@ -52,7 +53,7 @@ export default function RecapClient({ items, googleConnected, ai }: { items: Rec
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const pendingItems = items.filter((i) => i.status === "pending");
-  useEffect(() => { scanStore.setPending(pendingItems.length); }, [pendingItems.length]);
+  useEffect(() => { refreshBadge(); }, [pendingItems.length]);
   const done = items.filter((i) => i.status !== "pending");
 
   return (

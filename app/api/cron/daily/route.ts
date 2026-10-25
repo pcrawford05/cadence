@@ -5,6 +5,7 @@ import { syncGoogle } from "@/lib/google";
 import { digestText, dueList, inboxBatch } from "@/lib/cadence";
 import { pushToUser } from "@/lib/push";
 import { SupabaseRecap, generateFromSignals } from "@/lib/recap";
+import { badgeCounts } from "@/lib/badge";
 
 export const maxDuration = 60;
 
@@ -46,7 +47,19 @@ export async function GET(req: NextRequest) {
       const contacts = await repo.listContacts();
       const inbox = inboxBatch(contacts, new Date(), u.inbox_daily ?? 5, u.timezone);
       const msg = digestText(dueList(contacts, new Date(), { ...u.cadence }), Math.min(inbox.leftToday, inbox.remaining));
-      if (msg) r.pushed = await pushToUser(admin, u.user_id, { ...msg, url: msg.title.includes("to sort") ? "/inbox" : "/" });
+      const counts = await badgeCounts(repo, new SupabaseRecap(admin, u.user_id)).catch(() => null);
+      const badge = counts?.total;
+      if (msg) r.pushed = await pushToUser(admin, u.user_id, { ...msg, url: msg.title.includes("to sort") ? "/inbox" : "/", badge });
+
+      // Custom daily reminders: their own notification, cleared only by checking them off in the Inbox.
+      const open = ((u.reminders ?? []) as { text: string; done_on: string | null }[]).filter((x) => x.text?.trim() && x.done_on !== localDate);
+      if (open.length) {
+        r.reminders = await pushToUser(admin, u.user_id, {
+          title: open.length === 1 ? open[0].text : `${open.length} things to do today`,
+          body: open.length === 1 ? "Check it off in your Inbox when it's done." : open.map((x) => `• ${x.text}`).join("\n"),
+          url: "/inbox", tag: "cadence-reminders", badge,
+        });
+      }
       await admin.from("user_settings").update({ last_digest_date: localDate }).eq("user_id", u.user_id);
 
       // Every 3 days: draft the recap ahead of time, then ask who they met.
@@ -59,6 +72,7 @@ export async function GET(req: NextRequest) {
           body: found ? `Found ${found} ${found === 1 ? "conversation" : "conversations"} in your calendar and email. Add anyone else you talked to.` : "Log coffee chats, calls, and texts in about a minute.",
           url: "/recap",
           tag: "cadence-recap",
+          badge,
         });
         await admin.from("user_settings").update({ last_recap_at: new Date().toISOString() }).eq("user_id", u.user_id);
       }

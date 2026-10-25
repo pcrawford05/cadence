@@ -4,6 +4,7 @@ import { PageHeader } from "@/components/ui";
 import { FeedbackButton, McpToken, PushControls, SyncNow } from "@/components/SettingsClient";
 import { TYPES, TYPE_META } from "@/lib/types";
 import { isDemo } from "@/lib/supabase";
+import RemindersEditor from "@/components/RemindersEditor";
 
 export const dynamic = "force-dynamic";
 
@@ -47,6 +48,12 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
           <button className="btn-ghost">Save</button>
         </form>
       </Card>
+
+      <div id="reminders" className="scroll-mt-24">
+        <Card title="Daily reminders" sub="Anything you want to do every day. They show at the top of your Inbox, count toward the red badge, and arrive with the morning push. Each one clears only when you check it off.">
+          <RemindersEditor initial={s.reminders} />
+        </Card>
+      </div>
 
       <Card title="Notifications" sub="One push each morning listing who is due. Overdue people repeat weekly, not daily.">
         <PushControls vapidKey={process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY ?? ""} />

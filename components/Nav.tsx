@@ -6,6 +6,7 @@ import { openPalette } from "./Shortcuts";
 import { openFeedback } from "./Feedback";
 import { useRouter } from "next/navigation";
 import { scanStore } from "@/lib/scanStore";
+import { badgeStore } from "@/lib/badgeStore";
 
 const items = [
   { href: "/", label: "Due", icon: "M12 8v4l3 2M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" },
@@ -48,11 +49,19 @@ export default function Nav() {
   const [dragX, setDragX] = useState<number | null>(null); // finger x within the bar, for the liquid lens
 
   // Start the day's recap as soon as the app opens, so Recap is ready when you get there.
-  useEffect(() => { if (path === "/login") return; scanStore.count(); if (scanStore.due()) scanStore.run(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
-  useEffect(() => { if (path !== "/login") scanStore.count(); }, [path]);
-  const recap = useSyncExternalStore(scanStore.subscribe, scanStore.get, scanStore.server);
-  const badge = (href: string) => href === "/recap" && recap.pending > 0
-    ? <span aria-label={`${recap.pending} to review`} className="badge-pop absolute -right-1 -top-1 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-semibold leading-none text-white shadow-sm">{recap.pending > 9 ? "9+" : recap.pending}</span>
+  useEffect(() => {
+    if (path === "/login") return;
+    if (scanStore.due()) scanStore.run();
+    const on = () => badgeStore.refresh();
+    addEventListener("cadence:recap-updated", on);
+    addEventListener("focus", on);
+    return () => { removeEventListener("cadence:recap-updated", on); removeEventListener("focus", on); };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { if (path !== "/login") badgeStore.refresh(); }, [path]);
+  const counts = useSyncExternalStore(badgeStore.subscribe, badgeStore.get, badgeStore.server);
+  const countFor = (href: string) => (href === "/recap" ? counts.recap : href === "/inbox" ? counts.inbox + counts.reminders : 0);
+  const badge = (href: string) => countFor(href) > 0
+    ? <span key={countFor(href)} aria-label={`${countFor(href)} to do`} className="badge-pop absolute -right-1 -top-1 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-semibold leading-none text-white shadow-sm">{countFor(href) > 9 ? "9+" : countFor(href)}</span>
     : null;
 
   const tabAt = (x: number) => {

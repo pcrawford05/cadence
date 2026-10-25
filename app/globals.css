@@ -84,6 +84,7 @@ body::before {
 }
 
 @keyframes badge-in { from { transform: scale(0) } }
+.check-in { animation: badge-in 300ms var(--spring); }
 .badge-pop { animation: badge-in 380ms var(--spring); }
 @keyframes fade-in { from { opacity: 0 } }
 @keyframes sheet-in { from { opacity: 0; transform: translateY(24px) scale(.97) } }
@@ -135,10 +136,10 @@ html[data-splash="out"] #splash { animation: splash-out 500ms var(--ease-out) fo
 .splash-ring {
   fill: none; stroke-width: 7; stroke-linecap: round; stroke-dasharray: 0 100;
   transform-origin: 60px 60px; transform: rotate(calc(var(--rot) - 140deg));
-  animation: ring-draw 1200ms cubic-bezier(.4, 0, .2, 1) calc(var(--i) * 50ms) forwards;
+  animation: ring-draw 1000ms var(--spring) calc(var(--i) * 90ms) forwards, ring-breathe 1600ms ease-in-out 1200ms infinite alternate;
 }
-.splash-dot { fill: rgb(var(--ink)); transform-origin: 60px 60px; transform: scale(0); animation: dot-in 450ms var(--spring) 800ms forwards; }
-.splash-word { font-family: ui-serif, "Iowan Old Style", Palatino, Georgia, serif; font-size: 22px; font-weight: 600; letter-spacing: -.01em; opacity: 0; animation: word-in 450ms var(--ease-out) 850ms forwards; }
+.splash-dot { fill: rgb(var(--ink)); transform-origin: 60px 60px; transform: scale(0); animation: dot-in 500ms var(--spring) 650ms forwards; }
+.splash-word { font-family: ui-serif, "Iowan Old Style", Palatino, Georgia, serif; font-size: 22px; font-weight: 600; letter-spacing: -.01em; opacity: 0; animation: word-in 500ms var(--ease-out) 800ms forwards; }
 @keyframes ring-draw { to { stroke-dasharray: 22 100; transform: rotate(var(--rot)); } }
 @keyframes ring-breathe { to { stroke-dasharray: 30 100; } }
 @keyframes dot-in { to { transform: scale(1); } }

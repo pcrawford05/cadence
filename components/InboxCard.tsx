@@ -4,6 +4,7 @@ import PhotoDrop from "./PhotoDrop";
 import { StrengthPicker } from "./Strength";
 import { archiveFromInbox, triage } from "@/app/actions";
 import { TYPES, TYPE_META, type ContactType } from "@/lib/types";
+import { badgeStore, refreshBadge } from "@/lib/badgeStore";
 
 type Props = {
   c: { id: string; name: string; photo_url: string | null; type: ContactType | null; position: string | null; company: string | null; linkedin_url: string | null };
@@ -20,9 +21,10 @@ export default function InboxCard({ c, connected }: Props) {
     if (leaving) return;
     const fd = new FormData(form);
     setLeaving(kind);
+    badgeStore.bump("inbox", -1);
     start(async () => {
       await new Promise((r) => setTimeout(r, 820)); // let the fold finish before the list re-renders
-      try { kind === "saved" ? await triage(c.id, fd) : await archiveFromInbox(c.id); }
+      try { kind === "saved" ? await triage(c.id, fd) : await archiveFromInbox(c.id); refreshBadge(); }
       catch { setLeaving(""); }
     });
   };

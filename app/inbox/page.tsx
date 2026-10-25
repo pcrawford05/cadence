@@ -3,6 +3,8 @@ import { getRepo } from "@/lib/session";
 import { inboxBatch } from "@/lib/cadence";
 import { PageHeader } from "@/components/ui";
 import InboxCard from "@/components/InboxCard";
+import Reminders from "@/components/Reminders";
+import { localDate } from "@/lib/cadence";
 
 export const dynamic = "force-dynamic";
 
@@ -16,10 +18,14 @@ export default async function InboxPage({ searchParams }: { searchParams: Promis
   const info0 = inboxBatch(contacts, new Date(), settings.inbox_daily, settings.timezone, extra);
   const info = { ...info0, batch: await repo.withPhotos(info0.batch) };
 
+  const today = localDate(new Date(), settings.timezone);
+  const reminders = <Reminders items={settings.reminders.filter((r) => r.text.trim())} today={today} />;
+
   if (info.remaining === 0) {
     return (
       <>
         <PageHeader title="Inbox" sub="New connections to sort" />
+        {reminders}
         <div className="rounded-3xl border border-dashed border-line p-10 text-center">
           <p className="font-display text-2xl">Inbox zero</p>
           <p className="mt-1 text-sm text-muted">Import your LinkedIn connections to fill it.</p>
@@ -38,6 +44,7 @@ export default async function InboxPage({ searchParams }: { searchParams: Promis
         title={info.batch.length ? `Sort ${info.batch.length} ${info.batch.length === 1 ? "person" : "people"}` : "Done for today"}
         sub={`${info.remaining} connections waiting · ${info.doneToday} of ${quota} sorted today`}
       />
+      {reminders}
       <div className="mb-6 h-1.5 overflow-hidden rounded-full bg-line">
         <div className="h-full rounded-full bg-accent transition-all" style={{ width: `${pct}%` }} />
       </div>

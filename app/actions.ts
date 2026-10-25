@@ -364,3 +364,32 @@ export async function approveAll(ids: string[]) {
   revalidatePath("/inbox");
   return n;
 }
+
+/* ---------------- Daily reminders ---------------- */
+
+async function reminderCtx() {
+  const repo = await getRepo();
+  const s = await repo.getSettings();
+  const { localDate } = await import("@/lib/cadence");
+  return { repo, list: s.reminders, today: localDate(new Date(), s.timezone) };
+}
+
+/** Check or uncheck a reminder for today (the only way it clears). */
+export async function toggleReminder(id: string, done: boolean) {
+  const { repo, list, today } = await reminderCtx();
+  await repo.updateSettings({ reminders: list.map((r) => (r.id === id ? { ...r, done_on: done ? today : null } : r)) });
+  revalidatePath("/inbox");
+}
+
+export async function saveReminders(items: { id: string; text: string }[]) {
+  const { repo, list } = await reminderCtx();
+  const prev = new Map(list.map((r) => [r.id, r]));
+  const next = items
+    .map((i) => ({ id: i.id || crypto.randomUUID(), text: i.text.trim().slice(0, 140), done_on: prev.get(i.id)?.done_on ?? null }))
+    .filter((r) => r.text)
+    .slice(0, 20);
+  await repo.updateSettings({ reminders: next });
+  revalidatePath("/settings");
+  revalidatePath("/inbox");
+  return next;
+}

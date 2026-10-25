@@ -22,7 +22,11 @@ export interface Settings {
   google_last_sync: string | null;
   has_mcp_token: boolean;
   inbox_daily: number;
+  reminders: Reminder[];
 }
+
+/** A custom daily to-do. Checked off in the Inbox; resets each local day. */
+export interface Reminder { id: string; text: string; done_on: string | null }
 
 export interface Repo {
   userId: string;
@@ -37,7 +41,7 @@ export interface Repo {
   listInteractions(contactId: string): Promise<Interaction[]>;
   logInteraction(i: LogInput): Promise<Interaction | null>; // null = duplicate external_id
   getSettings(): Promise<Settings>;
-  updateSettings(p: Partial<Pick<Settings, "cadence" | "digest_hour" | "timezone" | "inbox_daily">>): Promise<void>;
+  updateSettings(p: Partial<Pick<Settings, "cadence" | "digest_hour" | "timezone" | "inbox_daily" | "reminders">>): Promise<void>;
   /** Bulk insert (LinkedIn import can be hundreds of rows). */
   createMany(inputs: ContactInput[]): Promise<number>;
   importRows(rows: ImportRow[]): Promise<number>;
@@ -146,9 +150,10 @@ export class SupabaseRepo implements Repo {
       google_last_sync: data?.google_last_sync ?? null,
       has_mcp_token: !!data?.mcp_token_hash,
       inbox_daily: data?.inbox_daily ?? 5,
+      reminders: Array.isArray(data?.reminders) ? data.reminders : [],
     };
   }
-  async updateSettings(p: Partial<Pick<Settings, "cadence" | "digest_hour" | "timezone" | "inbox_daily">>) {
+  async updateSettings(p: Partial<Pick<Settings, "cadence" | "digest_hour" | "timezone" | "inbox_daily" | "reminders">>) {
     const { error } = await this.db.from("user_settings").upsert({ user_id: this.userId, ...p });
     if (error) throw error;
   }
@@ -197,7 +202,7 @@ function store(): Store {
     g.__cadenceDemo = {
       contacts: [...seedContacts(), ...seedLinkedIn()],
       interactions: seedInteractions(),
-      settings: { cadence: { ...DEFAULT_CADENCE }, digest_hour: 8, timezone: "America/Los_Angeles", google_email: "demo@example.com", google_last_sync: new Date(Date.now() - 3.6e6 * 7).toISOString(), has_mcp_token: false, inbox_daily: 5 },
+      settings: { cadence: { ...DEFAULT_CADENCE }, digest_hour: 8, timezone: "America/Los_Angeles", google_email: "demo@example.com", google_last_sync: new Date(Date.now() - 3.6e6 * 7).toISOString(), has_mcp_token: false, inbox_daily: 5, reminders: [{ id: "r1", text: "Apply for 5 jobs", done_on: null }] },
     };
   }
   return g.__cadenceDemo;
@@ -245,7 +250,7 @@ export class DemoRepo implements Repo {
     return row;
   }
   async getSettings() { return store().settings; }
-  async updateSettings(p: Partial<Pick<Settings, "cadence" | "digest_hour" | "timezone" | "inbox_daily">>) { Object.assign(store().settings, p); }
+  async updateSettings(p: Partial<Pick<Settings, "cadence" | "digest_hour" | "timezone" | "inbox_daily" | "reminders">>) { Object.assign(store().settings, p); }
   async createMany(inputs: ContactInput[]) {
     for (const x of inputs) await this.createContact(x);
     return inputs.length;

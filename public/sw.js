@@ -5,15 +5,18 @@ self.addEventListener("activate", (e) => e.waitUntil(self.clients.claim()));
 self.addEventListener("push", (event) => {
   let data = { title: "Cadence", body: "You have people to reach out to", url: "/" };
   try { data = { ...data, ...event.data.json() }; } catch {}
-  event.waitUntil(
+  const badge = Number(data.badge);
+  const setBadge = Number.isFinite(badge) && self.navigator && "setAppBadge" in self.navigator
+    ? (badge > 0 ? self.navigator.setAppBadge(badge) : self.navigator.clearAppBadge()).catch(() => {})
+    : Promise.resolve();
+  event.waitUntil(Promise.all([setBadge,
     self.registration.showNotification(data.title, {
       body: data.body,
       icon: "/icon-192.png",
       badge: "/icon-192.png",
       data: { url: data.url },
       tag: data.tag || "cadence-digest",
-    })
-  );
+    })]));
 });
 
 self.addEventListener("notificationclick", (event) => {

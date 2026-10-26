@@ -135,7 +135,7 @@ export default function PhotoDrop({
               {initials}
             </div>
           )}
-          <div className={`absolute inset-0 flex items-center justify-center bg-black/55 text-center text-[11px] font-medium leading-tight text-white transition ${hover || pending ? "opacity-100" : "opacity-0"}`}>
+          <div className={`absolute inset-0 flex items-center justify-center bg-black/55 text-center text-xs font-medium leading-tight text-white transition ${hover || pending ? "opacity-100" : "opacity-0"}`}>
             {pending ? "Saving..." : <>Paste or<br />drop photo</>}
           </div>
         </div>
@@ -153,10 +153,10 @@ export default function PhotoDrop({
         </button>
       )}
       </div>
-      <button type="button" onClick={pasteButton} disabled={pending} className="text-[11px] font-medium text-muted underline-offset-2 hover:text-ink hover:underline">
+      <button type="button" onClick={pasteButton} disabled={pending} className="text-xs font-medium text-muted underline-offset-2 hover:text-ink hover:underline">
         {preview ? "Paste new photo" : "Paste photo"}
       </button>
-      {msg && <p className="max-w-[180px] text-center text-[11px] text-red-600">{msg}</p>}
+      {msg && <p className="max-w-[180px] text-center text-xs text-red-600">{msg}</p>}
       <input ref={fileRef} type="file" accept="image/*" className="sr-only" onChange={(e) => e.target.files?.[0] && save(e.target.files[0])} />
     </div>
   );

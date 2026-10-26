@@ -42,7 +42,7 @@ export default function Feedback() {
       if (/Server Action/i.test(String(e))) { setErr("Cadence just updated. Reloading so you can send…"); setTimeout(() => location.reload(), 1200); return; }
       return setErr("Couldn't send. Check your connection and try again.");
     }
-    if (!r.ok) return setErr(r.error ?? "Something went wrong.");
+    if (!r.ok) return setErr(r.error ?? "Couldn't send your feedback. Try again.");
     setDone(true); setMsg("");
     setTimeout(() => setOpen(false), 1800);
   });
@@ -74,7 +74,7 @@ export default function Feedback() {
               placeholder={kind === "bug" ? "What happened, and what did you expect?" : "What would make Cadence better?"}
               className="input mt-3"
             />
-            <p className="mt-1 text-[11px] text-muted">Includes the page you're on ({path}) so it's easy to find.</p>
+            <p className="mt-1 text-xs text-muted">Includes the page you're on ({path}) so it's easy to find.</p>
             {err && <p className="mt-2 text-sm text-red-600">{err}</p>}
             <div className="mt-4 flex items-center justify-end gap-2">
               <button type="button" onClick={() => setOpen(false)} className="btn-ghost">Cancel</button>

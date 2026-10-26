@@ -35,7 +35,7 @@ export default function Reminders({ items, today }: { items: Reminder[]; today: 
                 <span className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full border-2 transition-colors peer-focus-visible:ring-2 peer-focus-visible:ring-accent ${on ? "border-accent bg-accent text-white" : "border-line"}`}>
                   {on && <svg viewBox="0 0 24 24" className="check-in h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth={3.5} strokeLinecap="round" strokeLinejoin="round"><path d="m5 12.5 4.5 4.5L19 7.5" /></svg>}
                 </span>
-                <span className={`text-[15px] transition-colors ${on ? "text-muted line-through" : ""}`}>{r.text}</span>
+                <span className={`text-base transition-colors ${on ? "text-muted line-through" : ""}`}>{r.text}</span>
               </label>
             </li>
           );

@@ -118,7 +118,7 @@ export default function Nav() {
           </nav>
           <button onClick={openFeedback} className="ml-auto text-sm text-muted hover:text-ink" title="Send feedback (F)">Feedback</button>
           <button onClick={openPalette} className="glass-thin flex items-center gap-2 rounded-full px-3 py-1.5 text-sm text-muted hover:text-ink" title="Search (Cmd+K)">
-            Search <kbd className="rounded border border-line px-1 text-[11px]">⌘K</kbd>
+            Search <kbd className="rounded border border-line px-1 text-xs">⌘K</kbd>
           </button>
           <Link href="/contacts/new" className="btn-primary py-2">+ Add person</Link>
         </div>

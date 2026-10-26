@@ -17,7 +17,7 @@ export function StrengthPicker({ name = "strength", value }: { name?: string; va
           </label>
         ))}
       </div>
-      <div className="mt-1 flex justify-between text-[11px] text-muted">
+      <div className="mt-1 flex justify-between text-xs text-muted">
         <span>Unknown</span>
         <span>Familiar</span>
         <span>Inner circle</span>

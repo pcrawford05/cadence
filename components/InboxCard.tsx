@@ -15,17 +15,19 @@ type Props = {
 export default function InboxCard({ c, connected }: Props) {
   const [leaving, setLeaving] = useState<"" | "saved" | "skipped">("");
   const [type, setType] = useState<ContactType>("purple");
+  const [err, setErr] = useState("");
   const [, start] = useTransition();
 
   const go = (kind: "saved" | "skipped", form: HTMLFormElement) => {
     if (leaving) return;
     const fd = new FormData(form);
+    setErr("");
     setLeaving(kind);
     badgeStore.bump("inbox", -1);
     start(async () => {
       await new Promise((r) => setTimeout(r, 820)); // let the fold finish before the list re-renders
       try { kind === "saved" ? await triage(c.id, fd) : await archiveFromInbox(c.id); refreshBadge(); }
-      catch { setLeaving(""); }
+      catch { setLeaving(""); badgeStore.bump("inbox", 1); setErr(`Couldn't ${kind === "saved" ? "save" : "archive"} ${c.name}. Try again.`); }
     });
   };
 
@@ -71,6 +73,7 @@ export default function InboxCard({ c, connected }: Props) {
               ))}
               <input name="notes" placeholder="Note (how you know them)" className="input min-w-[200px] flex-1 rounded-full" />
             </div>
+            {err && <p role="alert" className="text-sm text-red-600 dark:text-red-400">{err}</p>}
             <div className="flex flex-wrap gap-2 border-t border-line pt-4">
               <button type="submit" disabled={!!leaving} className="btn-primary">Save</button>
               <button type="button" disabled={!!leaving} onClick={(e) => go("skipped", e.currentTarget.form!)} className="btn-ghost">Not someone to track</button>

@@ -187,10 +187,10 @@ function Card({ item, onDone }: { item: RecapItem; onDone: (m: string) => void }
             ) : (
               <>
                 <input value={name} onChange={(e) => setName(e.target.value)} className="min-w-0 max-w-full flex-1 rounded-lg border border-transparent bg-transparent px-1 py-0.5 text-lg font-semibold outline-none hover:border-line focus:border-accent" aria-label="Name" />
-                <span className="rounded-full bg-accent/10 px-2 py-0.5 text-[11px] font-semibold text-accent">New to Cadence</span>
+                <span className="rounded-full bg-accent/10 px-2 py-0.5 text-xs font-semibold text-accent">New to Cadence</span>
               </>
             )}
-            {low && <span className="rounded-full bg-amber-500/10 px-2 py-0.5 text-[11px] text-amber-700">Not sure</span>}
+            {low && <span className="rounded-full bg-amber-500/10 px-2 py-0.5 text-xs text-amber-700">Not sure</span>}
           </div>
           {p.kind === "existing" ? (
             p.sub && <p className="text-sm text-muted">{p.sub}</p>

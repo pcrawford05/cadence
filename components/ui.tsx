@@ -43,7 +43,7 @@ export function StatusPills({ statuses }: { statuses: Status[] }) {
   return (
     <div className="flex flex-wrap gap-1">
       {statuses.map((s) => (
-        <span key={s} className={`rounded-full px-2 py-0.5 text-[11px] font-medium capitalize ${STATUS_STYLE[s]}`}>{s}</span>
+        <span key={s} className={`rounded-full px-2 py-0.5 text-xs font-medium capitalize ${STATUS_STYLE[s]}`}>{s}</span>
       ))}
     </div>
   );

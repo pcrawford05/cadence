@@ -140,7 +140,7 @@ function Peek({ item, pos, onClose, onPrev, onNext }: { item: GridItem; pos: str
 function Cell({ k, v, hot }: { k: string; v: React.ReactNode; hot?: boolean }) {
   return (
     <div className="rounded-xl bg-paper px-3 py-2">
-      <dt className="text-[11px] uppercase tracking-wide text-muted">{k}</dt>
+      <dt className="text-xs uppercase tracking-wide text-muted">{k}</dt>
       <dd className={`font-medium ${hot ? "text-red-600 dark:text-red-400" : ""}`}>{v}</dd>
     </div>
   );

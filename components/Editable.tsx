@@ -35,9 +35,9 @@ function useSave(field: EditableField) {
 }
 
 function Status({ state, error }: { state: SaveState; error: string }) {
-  if (state === "saving") return <span className="text-[11px] text-muted">Saving…</span>;
-  if (state === "saved") return <span className="text-[11px] text-accent">✓ Saved</span>;
-  if (state === "error") return <span className="text-[11px] text-red-600">{error}</span>;
+  if (state === "saving") return <span className="text-xs text-muted">Saving…</span>;
+  if (state === "saved") return <span className="text-xs text-accent">✓ Saved</span>;
+  if (state === "error") return <span className="text-xs text-red-600">{error}</span>;
   return null;
 }
 
@@ -104,7 +104,7 @@ export function EditText({
           title="Click to edit"
         >
           {shown ? fmt(shown, format) : <span className="text-muted/70">{placeholder}</span>}
-          <span className="ml-1.5 text-[11px] text-muted opacity-0 transition group-hover:opacity-100">✎</span>
+          <span className="ml-1.5 text-xs text-muted opacity-0 transition group-hover:opacity-100">✎</span>
         </button>
       )}
       {!label && <Status state={state} error={error} />}

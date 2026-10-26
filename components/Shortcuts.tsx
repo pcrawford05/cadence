@@ -145,7 +145,7 @@ function Palette({ onClose }: { onClose: () => void }) {
               className={`flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-sm ${i === sel ? "bg-paper" : ""}`}
             >
               {it.person ? (
-                <span className="flex h-7 w-7 shrink-0 items-center justify-center overflow-hidden rounded-full text-[11px] font-semibold text-white" style={{ background: it.person.type ? TYPE_META[it.person.type].hex : "rgb(var(--muted))" }}>
+                <span className="flex h-7 w-7 shrink-0 items-center justify-center overflow-hidden rounded-full text-xs font-semibold text-white" style={{ background: it.person.type ? TYPE_META[it.person.type].hex : "rgb(var(--muted))" }}>
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   {it.person.photo ? <img src={it.person.photo} alt="" className="h-full w-full object-cover" /> : it.label.split(" ").map((w) => w[0]).slice(0, 2).join("")}
                 </span>
@@ -156,11 +156,11 @@ function Palette({ onClose }: { onClose: () => void }) {
                 <span className="block truncate font-medium">{it.label}</span>
                 {it.sub && <span className="block truncate text-xs text-muted">{it.sub}{it.person && !it.person.sorted ? " · in inbox" : ""}</span>}
               </span>
-              {it.hint && <kbd className="rounded border border-line px-1.5 py-0.5 text-[11px] text-muted">{it.hint}</kbd>}
+              {it.hint && <kbd className="rounded border border-line px-1.5 py-0.5 text-xs text-muted">{it.hint}</kbd>}
             </button>
           ))}
         </div>
-        <div className="flex gap-4 border-t border-line px-4 py-2 text-[11px] text-muted">
+        <div className="flex gap-4 border-t border-line px-4 py-2 text-xs text-muted">
           <span>↑↓ to move</span><span>↵ to open</span><span>Esc to close</span>
         </div>
       </div>

@@ -53,7 +53,10 @@ export default function Landing({ error }: { error?: string }) {
             </p>
             <div className="lp-rise mt-8" style={{ ["--d" as string]: 3 }}>
               <SignIn error={error} />
-              <p className="mt-3 text-balance text-sm text-muted">Invite only for now. Ask Peyton to add your Google account.</p>
+              <p className="mt-4 flex items-center justify-center gap-2.5 text-balance text-left text-sm text-muted lg:justify-start">
+                <img src="/peyton.jpg" alt="Peyton Crawford" width={36} height={36} className="h-9 w-9 shrink-0 rounded-full object-cover ring-2 ring-card" />
+                <span>Invite only for now. Ask Peyton to add your Google account.</span>
+              </p>
             </div>
           </div>
           <div className="lp-rise" style={{ ["--d" as string]: 5 }}>
@@ -105,7 +108,7 @@ export default function Landing({ error }: { error?: string }) {
 
       <footer className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-2 px-4 pb-10 text-sm text-muted sm:px-6">
         <span className="flex items-center gap-2"><Mark className="h-5 w-5" /> Cadence</span>
-        <span>Built for a small circle. Not for sale.</span>
+        <span className="flex items-center gap-2"><img src="/peyton.jpg" alt="" width={20} height={20} className="h-5 w-5 rounded-full object-cover" /> Built by Peyton for a small circle. Not for sale.</span>
       </footer>
     </div>
   );

@@ -157,6 +157,21 @@ html[data-splash="out"] #splash { animation: splash-out 500ms var(--ease-out) fo
 
 ::view-transition-old(root), ::view-transition-new(root) { animation-duration: 180ms; }
 
+/* Landing: the hero settles in once on load (6px rise, 2px blur), sections rise in once on scroll,
+   and the tagline lights word by word. Stories only run while on screen (components/landing). */
+.lp-rise { animation: lp-rise 700ms var(--ease-out) both; animation-delay: calc(var(--d, 0) * 70ms); }
+@keyframes lp-rise { from { opacity: 0; transform: translateY(6px); filter: blur(2px); } }
+.reveal { opacity: 0; transform: translateY(16px); transition: opacity 500ms var(--ease-out), transform 600ms var(--ease-out); }
+.reveal.is-in { opacity: 1; transform: none; }
+.tl-word { color: rgb(var(--ink) / .2); transition: color 450ms var(--ease-out); }
+.tl-word.is-lit { color: rgb(var(--ink)); }
+.deck-card { transition: transform 600ms var(--spring), opacity 400ms var(--ease-out); }
+.notif { opacity: 0; transform: translateY(-16px) scale(.97); transition: transform 500ms var(--spring), opacity 300ms var(--ease-out); }
+.notif.is-in { opacity: 1; transform: none; }
+.badge-dot { opacity: 0; transform: scale(.5); transition: transform 380ms var(--spring) 250ms, opacity 200ms var(--ease-out) 250ms; }
+.badge-dot.is-in { opacity: 1; transform: none; }
+.recap-card { animation: sheet-in 420ms var(--spring) both; }
+
 /* Reduce Motion: nothing moves, scales, or spins. Everything that animated becomes a gentle cross-fade,
    matching iOS when Reduce Motion and Prefer Cross-Fade Transitions are on. */
 @media (prefers-reduced-motion: reduce) {
@@ -168,6 +183,9 @@ html[data-splash="out"] #splash { animation: splash-out 500ms var(--ease-out) fo
   .inbox-row { transition: grid-template-rows 1ms linear 600ms, opacity 500ms ease-out !important; }
   button:not(:disabled):active, a.chip:active, .btn:active { transform: none; opacity: .7; }
   .animate-ping, .animate-pulse { animation: none !important; }
+  .lp-rise { animation: fade-in 400ms ease-out both !important; animation-delay: calc(var(--d, 0) * 60ms) !important; }
+  .reveal, .notif, .badge-dot { transform: none !important; }
+  .recap-card { animation: fade-in 280ms ease-out both !important; }
 
   /* Launch: the finished mark fades up ring by ring, then the wordmark; no drawing or rotation. */
   .splash-ring { stroke-dasharray: 22 100; transform: rotate(var(--rot)); opacity: 0;

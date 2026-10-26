@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { getRepo } from "@/lib/session";
+import { currentUser, getRepo } from "@/lib/session";
+import Landing from "@/components/landing/Landing";
 import { computeDue, dueList } from "@/lib/cadence";
 import { Avatar, ContactLink, PageHeader, StatusPills, relDays, sinceText } from "@/components/ui";
 import QuickActions from "@/components/QuickActions";
@@ -8,6 +9,7 @@ import { TYPE_META } from "@/lib/types";
 export const dynamic = "force-dynamic";
 
 export default async function DuePage() {
+  if (!(await currentUser())) return <Landing />;
   const repo = await getRepo();
   const [bare, settings] = await Promise.all([repo.listContactsBare(), repo.getSettings()]);
   const now = new Date();

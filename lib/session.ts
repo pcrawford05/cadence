@@ -19,11 +19,11 @@ export async function currentUser(): Promise<{ id: string; email: string } | nul
   return (await session()).user;
 }
 
-/** Repo for the signed-in user; redirects to /login when signed out. */
+/** Repo for the signed-in user; redirects to the landing page when signed out. */
 export const getRepo = cache(async (): Promise<Repo> => {
   if (isDemo()) return new DemoRepo();
   const { db, user } = await session();
-  if (!user || !db) redirect("/login");
+  if (!user || !db) redirect("/");
   return new SupabaseRepo(db, user.id);
 });
 
@@ -32,7 +32,7 @@ export async function getRecap() {
   const { DemoRecap, SupabaseRecap } = await import("./recap");
   if (isDemo()) return new DemoRecap();
   const { db, user } = await session();
-  if (!user || !db) redirect("/login");
+  if (!user || !db) redirect("/");
   return new SupabaseRecap(db, user.id);
 }
 

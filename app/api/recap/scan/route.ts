@@ -41,10 +41,10 @@ export async function POST(req: Request) {
     if (step === "draft") {
       const [store, settings] = await Promise.all([getRecap(), repo.getSettings()]);
       const { generateFromSignals } = await import("@/lib/recap");
-      const added = await generateFromSignals(store, repo, settings.timezone);
+      const { added, more } = await generateFromSignals(store, repo, settings.timezone);
       revalidatePath("/recap");
       const pending = (await store.listProposals()).filter((p) => p.status === "pending").length;
-      return NextResponse.json({ ok: true, added, pending });
+      return NextResponse.json({ ok: true, added, more, pending });
     }
     return NextResponse.json({ ok: false, error: "Unknown step" }, { status: 400 });
   } catch (e) {

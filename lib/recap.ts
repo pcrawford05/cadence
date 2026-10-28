@@ -103,10 +103,14 @@ export class DemoRecap implements RecapStore {
 
 const noonLocal = (date: string) => `${date}T19:00:00Z`; // ~noon Pacific; date is what matters
 
-/** Turn unreviewed Gmail/Calendar signals into proposals. Returns how many were added. */
-export async function generateFromSignals(store: RecapStore, repo: Repo, tz: string): Promise<number> {
-  const signals = await store.pendingSignals(14);
-  if (!signals.length) return 0;
+/** Most signals one scan request drafts; the rest wait for the next request (`more`). */
+const PER_RUN = 24;
+
+/** Turn unreviewed Gmail/Calendar signals into proposals. Returns how many were added and whether more are waiting. */
+export async function generateFromSignals(store: RecapStore, repo: Repo, tz: string): Promise<{ added: number; more: boolean }> {
+  const all = await store.pendingSignals(14);
+  if (!all.length) return { added: 0, more: false };
+  const signals = all.slice(0, PER_RUN);
   const contacts = await repo.listContactsBare();
   const drafts = await draftsFromSignals(signals, contacts, tz);
   await store.insertProposals(drafts.map((d) => {
@@ -118,7 +122,7 @@ export async function generateFromSignals(store: RecapStore, repo: Repo, tz: str
     };
   }));
   await store.markProcessed(signals.map((s) => s.id));
-  return drafts.length;
+  return { added: drafts.length, more: all.length > signals.length };
 }
 
 /** "Anyone else?" box. */

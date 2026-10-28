@@ -87,7 +87,7 @@ Rules:
 - Confidence: about 0.9 for a 1:1 calendar meeting or a named coffee/call; about 0.6 for an email thread; below 0.4 for ambiguous items.
 - Dates are local dates (YYYY-MM-DD). For free text, resolve words like "yesterday" relative to Today.`;
 
-async function callGemini(prompt: string, retried = false, attempt = 0, fast = false): Promise<unknown[]> {
+async function callGemini(prompt: string, retried = false, attempt = 0, fast = false, deadline = Infinity): Promise<unknown[]> {
   const first = await pickModel();
   // fast: Flash-Lite first, short timeouts, no waiting between models (typing in the recap box).
   const list = fast ? fastRanked : ranked;
@@ -101,21 +101,22 @@ async function callGemini(prompt: string, retried = false, attempt = 0, fast = f
       contents: [{ role: "user", parts: [{ text: prompt }] }],
       generationConfig: { responseMimeType: "application/json", responseSchema: SCHEMA, temperature: 0.2, ...(legacy ? { thinkingConfig: { thinkingBudget: 0 } } : {}) },
     }),
-    signal: AbortSignal.timeout(fast ? 6_000 : 50_000),
+    signal: AbortSignal.timeout(Math.max(1_000, Math.min(fast ? 6_000 : 25_000, deadline - Date.now()))),
   }).catch((e) => {
     if (fast && attempt < 2) return null; // timed out: try the next model
     throw e;
   });
-  if (!r) return callGemini(prompt, retried, attempt + 1, fast);
+  if (!r) return callGemini(prompt, retried, attempt + 1, fast, deadline);
   if (!r.ok) {
     const body = await r.text().catch(() => "");
     console.warn(`[gemini] ${model} ${r.status}, trying next`);
-    if ((r.status === 503 || r.status === 500 || r.status === 429) && attempt < Math.min(fast ? 2 : 6, list.length + (fast ? 0 : 1))) {
+    // Retry on the next model only while there is time left before the route's limit.
+    if ((r.status === 503 || r.status === 500 || r.status === 429) && attempt < Math.min(fast ? 2 : 6, list.length + (fast ? 0 : 1)) && deadline - Date.now() > 8_000) {
       if (!fast) await new Promise((ok) => setTimeout(ok, 1200));
-      return callGemini(prompt, retried, attempt + 1, fast);
+      return callGemini(prompt, retried, attempt + 1, fast, deadline);
     }
     if (r.status === 429) throw new Error("Gemini's free limit was hit. Try again in a minute.");
-    if ((r.status === 404 || r.status === 400) && !retried && !process.env.GEMINI_MODEL) { resolved = null; return callGemini(prompt, true, 0, fast); }
+    if ((r.status === 404 || r.status === 400) && !retried && !process.env.GEMINI_MODEL) { resolved = null; return callGemini(prompt, true, 0, fast, deadline); }
     console.error(`[gemini] ${model} ${r.status}: ${body.slice(0, 500)}`);
     throw new Error(`Gemini (${model}) error ${r.status}: ${body.slice(0, 160)}`);
   }
@@ -135,7 +136,7 @@ function directory(contacts: Contact[], focusEmails: Set<string>, freeText = "",
     c.emails.some((e) => focusEmails.has(e.toLowerCase())) || c.name.toLowerCase().split(/\s+/).some((p) => words.has(p)),
   );
   if (lean) return relevant.slice(0, 40).map((c) => `${c.id} | ${c.name} | ${c.emails[0] ?? ""} | ${[c.position, c.company].filter(Boolean).join(" at ")}`).join("\n") || "(no likely matches)";
-  const list = (relevant.length ? relevant : []).concat(contacts.filter((c) => !relevant.includes(c)).slice(0, Math.max(0, 400 - relevant.length)));
+  const list = (relevant.length ? relevant : []).concat(contacts.filter((c) => !relevant.includes(c)).slice(0, Math.max(0, 150 - relevant.length)));
   return list.map((c) => `${c.id} | ${c.name} | ${c.emails.join(" ")} | ${[c.position, c.company].filter(Boolean).join(" at ")}`).join("\n");
 }
 
@@ -180,24 +181,36 @@ function clean(raw: unknown[], contacts: Contact[], signalsCount: number, today:
 
 const localDay = (iso: string, tz: string) => new Intl.DateTimeFormat("en-CA", { timeZone: tz, year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date(iso));
 
-/** Gmail/Calendar evidence -> drafts. Uses Gemini when configured, else a simple rule-based pass. */
-export async function draftsFromSignals(signals: SignalInput[], contacts: Contact[], tz: string): Promise<Draft[]> {
+/**
+ * Gmail/Calendar evidence -> drafts. Uses Gemini when configured, else a simple rule-based pass.
+ * Batches run in parallel and stop at `deadline`, so the scan route never hits Vercel's 60s limit;
+ * a batch that fails or runs out of time falls back to simple matching instead of losing its signals.
+ */
+export async function draftsFromSignals(signals: SignalInput[], contacts: Contact[], tz: string, deadline = Date.now() + 40_000): Promise<Draft[]> {
   if (!signals.length) return [];
   const today = localDay(new Date().toISOString(), tz);
   if (!aiEnabled()) return heuristic(signals, contacts, tz);
-  // Small parallel batches: each call returns in a few seconds instead of one long call.
   const CHUNK = 8;
-  const out: unknown[] = [];
-  try {
-    for (let start = 0; start < signals.length; start += CHUNK) {
-      out.push(...(await callGemini(promptFor(signals.slice(start, start + CHUNK), start, contacts, tz, today))));
+  const chunks: number[] = [];
+  for (let start = 0; start < signals.length; start += CHUNK) chunks.push(start);
+  const parts = await Promise.all(chunks.map(async (start) => {
+    const batch = signals.slice(start, start + CHUNK);
+    try {
+      return clean(await callGemini(promptFor(batch, start, contacts, tz, today), false, 0, false, deadline), contacts, signals.length, today);
+    } catch (e) {
+      // Gemini busy, slow or out of free quota: still give the user something to review.
+      console.warn(`[gemini] batch ${start} falling back to simple matching:`, (e as Error).message);
+      return heuristic(batch, contacts, tz).map((d) => ({ ...d, signalIndex: d.signalIndex! + start }));
     }
-  } catch (e) {
-    // Gemini busy or out of free quota: still give the user something to review.
-    console.warn("[gemini] falling back to simple matching:", (e as Error).message);
-    if (!out.length) return heuristic(signals, contacts, tz);
-  }
-  return clean(out, contacts, signals.length, today);
+  }));
+  // one entry per person per day, across batches
+  const seen = new Set<string>();
+  return parts.flat().filter((d) => {
+    const k = `${d.contactId ?? d.newPerson?.email ?? d.newPerson?.name.toLowerCase()}|${d.date}`;
+    if (seen.has(k)) return false;
+    seen.add(k);
+    return true;
+  });
 }
 
 function promptFor(signals: SignalInput[], offset: number, contacts: Contact[], tz: string, today: string) {

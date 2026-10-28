@@ -34,15 +34,21 @@ export const scanStore = {
       const r = await fetch(`/api/recap/scan?step=${s}${force ? "&force=1" : ""}`, { method: "POST" });
       const j = await r.json().catch(() => ({ ok: false, error: `Scan failed (${r.status}). Try again.` }));
       if (!j.ok) throw new Error(j.error ?? "Scan failed");
-      return j as { added?: number; connected?: boolean; pending?: number };
+      return j as { added?: number; more?: boolean; connected?: boolean; pending?: number };
     };
     try {
       set({ phase: "sync", msg: "" });
       const s = await step("sync");
       if (s.connected === false) { set({ phase: "idle" }); return; }
       set({ phase: "draft" });
-      const { added = 0, pending = state.pending } = await step("draft");
-      set({ pending });
+      // Drafting goes in rounds so each request stays well under the server's time limit.
+      let added = 0;
+      for (let round = 0; round < 6; round++) {
+        const d = await step("draft");
+        added += d.added ?? 0;
+        set({ pending: d.pending ?? state.pending });
+        if (!d.more) break;
+      }
       set({ phase: "done", at: new Date().toISOString(), msg: added ? `Found ${added} new ${added === 1 ? "conversation" : "conversations"}` : "You're up to date" });
     } catch (e) {
       set({ phase: "error", msg: (e as Error).message, at: new Date().toISOString() });

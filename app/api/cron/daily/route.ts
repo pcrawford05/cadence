@@ -32,7 +32,7 @@ export async function GET(req: NextRequest) {
         r.sync = await syncGoogle(repo, admin, u.google_refresh_token, u.google_email);
         await admin.from("user_settings").update({ google_last_sync: new Date().toISOString() }).eq("user_id", u.user_id);
         // Draft every day so the Recap page opens with results instead of waiting on Gemini.
-        try { r.drafted = await generateFromSignals(new SupabaseRecap(admin, u.user_id), repo, u.timezone); } catch (e) { r.recapError = (e as Error).message; }
+        try { r.drafted = (await generateFromSignals(new SupabaseRecap(admin, u.user_id), repo, u.timezone)).added; } catch (e) { r.recapError = (e as Error).message; }
       }
     } catch (e) {
       r.syncError = (e as Error).message; // e.g. expired refresh token: user must reconnect

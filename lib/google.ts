@@ -41,6 +41,21 @@ const stripHtml = (s: string) => s.replace(/<[^>]+>/g, " ").replace(/&nbsp;/g, "
  * backfill), which is logged directly for people already in Cadence.
  * Email counts only when the thread is two-way (both you and they wrote in it).
  */
+/** One Gmail request, retried with a short wait when Gmail says the per-minute quota is used up. */
+async function gmailCall<T>(fn: () => Promise<T>, tries = 3): Promise<T> {
+  for (let n = 1; ; n++) {
+    try { return await fn(); } catch (e) {
+      const status = (e as { code?: number; status?: number }).code ?? (e as { status?: number }).status;
+      const quota = status === 429 || (status === 403 && /quota|rate/i.test((e as Error).message));
+      if (!quota || n >= tries) {
+        if (quota) throw new Error("Gmail is rate limiting this account. Wait a minute and scan again.");
+        throw e;
+      }
+      await new Promise((ok) => setTimeout(ok, 2_000 * n));
+    }
+  }
+}
+
 export async function syncGoogle(
   repo: Repo, admin: SupabaseClient, encryptedRefresh: string, selfEmail: string, days = 3,
   opts: { autoLogBefore?: Date } = {},
@@ -67,28 +82,29 @@ export async function syncGoogle(
   let pageToken: string | undefined;
   let scanned = 0;
   let done = false;
-  // Fetch dates 25 at a time; Gmail allows it and sequential gets were the slow part of a scan.
+  // Gmail allows 6,000 quota units per user per minute (messages.get 5, threads.get 10, list 5).
+  // A sync stays near half of that: at most 200 message dates and 150 threads, 10 requests at a time.
   do {
-    const r = await gmail.users.messages.list({ userId: "me", labelIds: ["SENT"], maxResults: 100, pageToken });
+    const r = await gmailCall(() => gmail.users.messages.list({ userId: "me", labelIds: ["SENT"], maxResults: 100, pageToken }));
     const ids = (r.data.messages ?? []).map((m) => m.id!).filter(Boolean);
-    for (let i = 0; i < ids.length && !done; i += 25) {
-      const metas = await Promise.all(ids.slice(i, i + 25).map((id) => gmail.users.messages.get({ userId: "me", id, format: "minimal" })));
+    for (let i = 0; i < ids.length && !done; i += 10) {
+      const metas = await Promise.all(ids.slice(i, i + 10).map((id) => gmailCall(() => gmail.users.messages.get({ userId: "me", id, format: "minimal" }))));
       for (const meta of metas) {
         scanned++;
         if (Number(meta.data.internalDate ?? 0) < since) { done = true; break; }
         if (meta.data.threadId) threadSet.add(meta.data.threadId);
       }
-      if (scanned >= 400) done = true;
+      if (scanned >= 200) done = true;
     }
     pageToken = r.data.nextPageToken ?? undefined;
   } while (pageToken && !done);
-  const threads = [...threadSet];
+  const threads = [...threadSet].slice(0, 150);
 
   type ThreadRes = { data: { messages?: { internalDate?: string | null; payload?: { headers?: { name?: string | null; value?: string | null }[] } }[] } };
   const fetched = new Map<string, ThreadRes>();
-  for (let i = 0; i < threads.length; i += 20) {
-    const batch = threads.slice(i, i + 20);
-    (await Promise.all(batch.map((id) => gmail.users.threads.get({ userId: "me", id, format: "metadata", metadataHeaders: ["From", "To", "Cc", "Subject"] }))))
+  for (let i = 0; i < threads.length; i += 10) {
+    const batch = threads.slice(i, i + 10);
+    (await Promise.all(batch.map((id) => gmailCall(() => gmail.users.threads.get({ userId: "me", id, format: "metadata", metadataHeaders: ["From", "To", "Cc", "Subject"] })))))
       .forEach((t, j) => fetched.set(batch[j], t as unknown as ThreadRes));
   }
   for (const id of threads) {

@@ -108,7 +108,7 @@ export default function Landing({ error }: { error?: string }) {
 
       <footer className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-2 px-4 pb-10 text-sm text-muted sm:px-6">
         <span className="flex items-center gap-2"><Mark className="h-5 w-5" /> Cadence</span>
-        <span className="flex items-center gap-2"><img src="/peyton.jpg" alt="" width={20} height={20} className="h-5 w-5 rounded-full object-cover" /> Built by Peyton for a small circle. Not for sale.</span>
+        <span className="flex items-center gap-2"><img src="/peyton.jpg" alt="" width={20} height={20} className="h-5 w-5 rounded-full object-cover" /> Built by Peyton for a small circle. Not for sale. <a href="/privacy" className="underline underline-offset-2 hover:text-ink">Privacy</a></span>
       </footer>
     </div>
   );

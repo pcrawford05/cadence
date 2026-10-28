@@ -1,7 +1,7 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
-const PUBLIC = ["/login", "/welcome", "/auth/callback", "/api/cron", "/api/mcp", "/manifest.webmanifest", "/sw.js", "/demo", "/icon"];
+const PUBLIC = ["/login", "/welcome", "/privacy", "/auth/callback", "/api/cron", "/api/mcp", "/manifest.webmanifest", "/sw.js", "/demo", "/icon"];
 
 /** Passes the path to the root layout, which hides the app chrome on the landing page. */
 function next(req: NextRequest) {

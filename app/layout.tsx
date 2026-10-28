@@ -26,7 +26,7 @@ export const viewport: Viewport = {
   ],
 };
 
-const LANDING = ["/welcome", "/login"];
+const LANDING = ["/welcome", "/login", "/privacy"];
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
   // Signed out (or on a landing path), the page is the marketing site: no tabs, no splash, no app shortcuts.

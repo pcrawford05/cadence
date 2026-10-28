@@ -6,11 +6,10 @@ import { useStory } from "./Motion";
 
 /** Fictional people for the landing visuals. Photos are the demo-mode illustrations. */
 const PEOPLE: { name: string; role: string; type: ContactType; due: string; over: boolean; last: string; photo: string }[] = [
-  { name: "Maya Chen", role: "Partner at Fieldstone Ventures", type: "red", due: "3 days overdue", over: true, last: "Talked 17d ago", photo: "/demo/p3.svg" },
-  { name: "Jordan Ellis", role: "Recruiter at Brightline", type: "orange", due: "Due today", over: false, last: "Talked 1mo ago", photo: "/demo/p5.svg" },
-  { name: "Priya Raman", role: "Founder of Kestrel Bio", type: "yellow", due: "6 days overdue", over: true, last: "Talked 3mo ago", photo: "/demo/p8.svg" },
-  { name: "Marcus Webb", role: "Engineering lead at Harbor", type: "orange", due: "Due today", over: false, last: "Talked 1mo ago", photo: "/demo/p2.svg" },
-  { name: "Sofia Alvarez", role: "Professor at USC Marshall", type: "green", due: "11 days overdue", over: true, last: "Talked 6mo ago", photo: "/demo/p11.svg" },
+  { name: "Leo Palatnik", role: "VP at Phoenician Investment Fund", type: "red", due: "3 days overdue", over: true, last: "Talked 17d ago", photo: "/demo/p3.svg" },
+  { name: "Peyton Crawford", role: "Student at USC", type: "orange", due: "Due today", over: false, last: "Talked 1mo ago", photo: "/peyton.jpg" },
+  { name: "Elijah Benford", role: "Scout at Impact Venture Capital", type: "yellow", due: "6 days overdue", over: true, last: "Talked 3mo ago", photo: "/demo/p8.svg" },
+  { name: "Collin Graham", role: "Founder of SoCET at UCLA", type: "green", due: "Due today", over: false, last: "Talked 6mo ago", photo: "/demo/p2.svg" },
 ];
 
 const ROW = 104; // card height plus gap, in px
@@ -84,9 +83,9 @@ export function Rhythm() {
   return (
     <div ref={ref} className="flex flex-col items-center gap-4">
       <div className="flex items-center gap-3">
-        <div className="transition-transform duration-300" key={t}><Avatar c={{ name: "Maya Chen", photo_url: "/demo/p3.svg", type: t }} size={64} /></div>
+        <div className="transition-transform duration-300" key={t}><Avatar c={{ name: "Peyton Crawford", photo_url: "/peyton.jpg", type: t }} size={64} /></div>
         <div>
-          <p className="font-semibold">Maya Chen</p>
+          <p className="font-semibold">Peyton Crawford</p>
           <p className="text-sm text-muted">Next check in <span className="font-medium text-ink">{NEXT[t]}</span></p>
         </div>
       </div>
@@ -118,7 +117,7 @@ export function Morning() {
           <span className="ml-auto">now</span>
         </div>
         <p className="mt-1.5 text-sm font-semibold">3 people today</p>
-        <p className="text-sm text-white/80">Maya, Jordan and Priya are due. Tap to see them.</p>
+        <p className="text-sm text-white/80">Leo, Peyton and Elijah are due. Tap to see them.</p>
       </div>
       <div className="mt-4 flex justify-center">
         <div className="relative">
@@ -141,7 +140,7 @@ export function Recap() {
           <rect x="3" y="5" width="18" height="16" rx="3" /><path d="M3 10h18M8 3v4M16 3v4" />
         </svg>
         <div className="min-w-0">
-          <p className="truncate text-sm font-medium">Coffee with Jordan Ellis</p>
+          <p className="truncate text-sm font-medium">Coffee with Collin Graham</p>
           <p className="text-xs text-muted">Calendar · Tue 10:00 AM</p>
         </div>
       </div>
@@ -157,8 +156,8 @@ export function Recap() {
         ) : phase < 3 ? (
           <div className="recap-card is-in">
             <div className="flex items-center gap-2.5">
-              <Avatar c={{ name: "Jordan Ellis", photo_url: "/demo/p5.svg", type: "orange" }} size={36} />
-              <p className="text-sm">Log a coffee chat with <span className="font-semibold">Jordan Ellis</span>?</p>
+              <Avatar c={{ name: "Collin Graham", photo_url: "/demo/p2.svg", type: "green" }} size={36} />
+              <p className="text-sm">Log a coffee chat with <span className="font-semibold">Collin Graham</span>?</p>
             </div>
             <div className="mt-3 flex gap-2">
               <span className={`btn-primary pointer-events-none ${phase === 2 ? "scale-95 ring-4 ring-accent/30" : ""}`}>Approve</span>
@@ -167,7 +166,7 @@ export function Recap() {
           </div>
         ) : (
           <p className="recap-card is-in flex items-center gap-2 py-1.5 text-sm font-semibold text-accent">
-            <Check /> Logged. Jordan is next due Nov 27.
+            <Check /> Logged. Collin is next due in 6 months.
           </p>
         )}
       </div>

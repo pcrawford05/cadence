@@ -5,6 +5,7 @@ import { getRepo } from "@/lib/session";
 import { computeDue } from "@/lib/cadence";
 import { PageHeader, relDays, sinceText } from "@/components/ui";
 import PeopleGrid from "@/components/PeopleGrid";
+import PeopleSearch from "@/components/PeopleSearch";
 import Pager, { paginate } from "@/components/Pager";
 import { STATUSES, TYPES, TYPE_META } from "@/lib/types";
 
@@ -45,6 +46,11 @@ export default async function PeoplePage({ searchParams }: { searchParams: SP })
     .map((c) => ({ c, d: computeDue(c, now, settings.cadence) }));
 
   if (!sp.sort) list = shuffle(list, Number(sp.seed));
+  // Searching: people whose name matches come before matches in company or notes.
+  if (q && !sp.sort) {
+    const rank = (n: string) => (n.toLowerCase().startsWith(q) ? 0 : n.toLowerCase().includes(q) ? 1 : 2);
+    list = list.sort((a, b) => rank(a.c.name) - rank(b.c.name));
+  }
   if (sp.sort === "az") list = list.sort((a, b) => a.c.name.localeCompare(b.c.name));
   if (sp.sort === "due") list = list.sort((a, b) => (b.d.daysOverdue ?? -1e9) - (a.d.daysOverdue ?? -1e9));
   if (sp.sort === "strength") list = list.sort((a, b) => (b.c.strength ?? 0) - (a.c.strength ?? 0));
@@ -74,13 +80,7 @@ export default async function PeoplePage({ searchParams }: { searchParams: SP })
         }
       />
 
-      <form className="mb-4" action="/people">
-        {sp.type && <input type="hidden" name="type" value={sp.type} />}
-        {sp.status && <input type="hidden" name="status" value={sp.status} />}
-        {sp.sort && <input type="hidden" name="sort" value={sp.sort} />}
-        {sp.unsorted && <input type="hidden" name="unsorted" value={sp.unsorted} />}
-        <input id="people-search" name="q" defaultValue={sp.q} placeholder="Search name, company, notes   ( / )" className="input max-w-md rounded-full px-4" />
-      </form>
+      <PeopleSearch />
 
       <ChipRow className="mb-2">
         {TYPES.map((t) => (

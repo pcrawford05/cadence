@@ -4,8 +4,9 @@ import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Avatar, StatusPills } from "./ui";
 import { StrengthBadge } from "./Strength";
-import { markTalked, snooze } from "@/app/actions";
-import { TYPE_META, type Contact } from "@/lib/types";
+import { markTalked, setLastTalked, snooze } from "@/app/actions";
+import { EditStatuses, EditStrength, EditText, EditType, EditableProvider } from "./Editable";
+import type { Contact } from "@/lib/types";
 
 export type GridItem = { c: Contact; dueText: string; hot: boolean; lastText: string; nextText: string };
 
@@ -85,7 +86,9 @@ function Peek({ item, pos, onClose, onPrev, onNext }: { item: GridItem; pos: str
   const [done, setDone] = useState("");
   useEffect(() => setDone(""), [c.id]);
 
-  const act = (label: string, fn: () => Promise<unknown>) => start(async () => { await fn(); setDone(label); router.refresh(); });
+  const act = (label: string, fn: () => Promise<unknown>) => start(async () => {
+    try { await fn(); setDone(label); router.refresh(); } catch (e) { setDone(`Couldn't save: ${(e as Error).message}`); }
+  });
 
   return (
     <div className="fixed inset-0 z-40 flex items-end justify-center scrim sm:items-center sm:px-4" onMouseDown={onClose}>
@@ -107,12 +110,33 @@ function Peek({ item, pos, onClose, onPrev, onNext }: { item: GridItem; pos: str
 
         <dl className="mt-4 grid grid-cols-2 gap-2 text-sm">
           <Cell k="Next" v={nextText} hot={hot} />
-          <Cell k="Last talked" v={lastText} />
-          <Cell k="Reach out" v={c.type ? <span className="inline-flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full" style={{ background: TYPE_META[c.type].hex }} />{TYPE_META[c.type].blurb}</span> : "Not set"} />
-          <Cell k="Strength" v={<StrengthBadge value={c.strength} showLabel />} />
+          <div className="rounded-xl bg-paper px-3 py-2">
+            <dt className="text-xs uppercase tracking-wide text-muted">Last talked</dt>
+            <dd className="flex items-center gap-2 font-medium">
+              <span className="truncate">{lastText}</span>
+              <label className="ml-auto shrink-0 cursor-pointer text-xs font-normal text-accent hover:underline">
+                Set
+                <input
+                  type="date"
+                  max={new Date().toISOString().slice(0, 10)}
+                  className="sr-only"
+                  aria-label={`When you last talked with ${c.name}`}
+                  onChange={(e) => e.target.value && act("Set last talked", () => setLastTalked(c.id, e.target.value))}
+                />
+              </label>
+            </dd>
+          </div>
         </dl>
-        {c.statuses.length > 0 && <div className="mt-3"><StatusPills statuses={c.statuses} /></div>}
-        {c.notes && <p className="mt-3 line-clamp-4 whitespace-pre-wrap rounded-xl bg-paper p-3 text-sm">{c.notes}</p>}
+
+        {/* Same inline editors as the profile: each change saves on its own. */}
+        <EditableProvider id={c.id}>
+          <div key={c.id} className="mt-4 max-h-[42vh] space-y-4 overflow-y-auto pr-1">
+            <EditType value={c.type} />
+            <EditStrength value={c.strength} />
+            <EditStatuses value={c.statuses} />
+            <EditText field="notes" value={c.notes} label="Notes" placeholder="How you know them, what to follow up on" multiline />
+          </div>
+        </EditableProvider>
 
         <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-sm">
           {c.emails[0] && <a className="text-accent hover:underline" href={`mailto:${c.emails[0]}`}>{c.emails[0]}</a>}

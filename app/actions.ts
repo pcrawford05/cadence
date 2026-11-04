@@ -147,8 +147,18 @@ export async function triage(id: string, f: FormData) {
     ...(notes ? { notes } : {}),
     triaged_at: new Date().toISOString(),
   });
+  const last = String(f.get("last_talked") ?? "");
+  if (/^\d{4}-\d{2}-\d{2}$/.test(last)) await repo.logInteraction({ contact_id: id, occurred_at: last + "T12:00:00Z", kind: "manual", source: "manual", summary: "Talked" });
   refresh(id);
   revalidatePath("/inbox");
+}
+
+/** Sets when you last talked by logging a conversation on that day (the timeline stays the source of truth). */
+export async function setLastTalked(id: string, date: string) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || date > new Date().toISOString().slice(0, 10)) throw new Error("Pick a day that isn't in the future.");
+  const repo = await getRepo();
+  await repo.logInteraction({ contact_id: id, occurred_at: date + "T12:00:00Z", kind: "manual", source: "manual", summary: "Talked" });
+  refresh(id);
 }
 
 /** Not someone to track: keep the record (so re-imports don't resurface them) but leave it untyped. */
@@ -254,9 +264,10 @@ export async function updateField(id: string, field: EditableField, raw: unknown
 
 export async function paletteIndex() {
   const repo = await getRepo();
-  return (await repo.listContacts()).map((c) => ({
+  // Bare list: signing every photo URL was the slow part, and the palette only needs names.
+  return (await repo.listContactsBare()).map((c) => ({
     id: c.id, name: c.name, sub: [c.position, c.company].filter(Boolean).join(" at ") || c.location || "",
-    photo: c.photo_url, type: c.type, sorted: !!c.triaged_at,
+    photo: null, type: c.type, sorted: !!c.triaged_at,
   }));
 }
 

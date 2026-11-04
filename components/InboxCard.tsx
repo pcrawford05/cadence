@@ -64,6 +64,10 @@ export default function InboxCard({ c, connected }: Props) {
               </div>
             </label>
             <StrengthPicker />
+            <label className="block max-w-sm">
+              <span className="label">Last talked (optional)</span>
+              <input type="date" name="last_talked" max={new Date().toISOString().slice(0, 10)} className="input rounded-full" />
+            </label>
             <div className="flex flex-wrap items-center gap-2">
               {(["nurture", "priority"] as const).map((s) => (
                 <label key={s} className="chip cursor-pointer capitalize has-[:checked]:border-ink has-[:checked]:bg-paper">

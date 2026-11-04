@@ -5,6 +5,7 @@ import { updateField, type EditableField } from "@/app/actions";
 import { STATUSES, STRENGTH_SCALE, TYPES, TYPE_META, type ContactType, type Status } from "@/lib/types";
 
 /** Fields whose change alters computed values (due date, status hints) on the page. */
+const AUTO: Status[] = ["active", "dormant"];
 const DERIVED: EditableField[] = ["type", "statuses", "cadence_days_override", "priority_due", "date_met"];
 
 type SaveState = "idle" | "saving" | "saved" | "error";
@@ -171,14 +172,19 @@ const STATUS_ON: Record<Status, string> = {
   new: "bg-sky-500/10 text-sky-700 border-sky-500/30 dark:text-sky-400",
 };
 
+/** Active and Dormant come from recency and show as read-only; the other tags toggle. */
 export function EditStatuses({ value }: { value: Status[] }) {
   const { state, error, save } = useSave("statuses");
-  const [v, setV] = useState<Status[]>(value);
+  const auto = value.filter((s) => AUTO.includes(s));
+  const [v, setV] = useState<Status[]>(value.filter((s) => !AUTO.includes(s)));
   return (
     <div>
       <div className="flex items-center justify-between"><span className="label !mb-1">Status</span><Status state={state} error={error} /></div>
       <div className="flex flex-wrap gap-1.5">
-        {STATUSES.map((s) => {
+        {auto.map((s) => (
+          <span key={s} title="Set from how recently you talked" className={`rounded-full border px-2.5 py-0.5 text-xs font-medium capitalize ${STATUS_ON[s]}`}>{s} · auto</span>
+        ))}
+        {STATUSES.filter((s) => !AUTO.includes(s)).map((s) => {
           const on = v.includes(s);
           return (
             <button

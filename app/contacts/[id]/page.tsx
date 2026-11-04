@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import { getRepo } from "@/lib/session";
-import { computeDue, suggestStatuses } from "@/lib/cadence";
-import { StatusPills, relDays, sinceText } from "@/components/ui";
+import { computeDue } from "@/lib/cadence";
+import { relDays, sinceText } from "@/components/ui";
 import QuickActions from "@/components/QuickActions";
 import { deleteContact, logInteraction } from "@/app/actions";
 import { TYPE_META } from "@/lib/types";
@@ -19,8 +19,6 @@ export default async function ContactPage({ params }: { params: Promise<{ id: st
   if (!c) notFound();
   const now = new Date();
   const d = computeDue(c, now, settings.cadence);
-  const suggested = suggestStatuses(c, now, settings.cadence);
-  const suggestionDiffers = suggested.slice().sort().join() !== c.statuses.slice().sort().join();
   const cadenceLabel = c.cadence_days_override ? `Every ${c.cadence_days_override} days` : c.type ? TYPE_META[c.type].blurb : "No cadence";
 
   return (
@@ -56,12 +54,6 @@ export default async function ContactPage({ params }: { params: Promise<{ id: st
         </aside>
 
         <section className="space-y-6">
-          {suggestionDiffers && suggested.length > 0 && (
-            <div className="rounded-2xl border border-accent/30 bg-accent/5 p-4 text-sm">
-              Based on recency, status could be <StatusPills statuses={suggested} />
-            </div>
-          )}
-
           <div className="rounded-3xl border border-line bg-card p-5">
             <EditText field="notes" value={c.notes} label="Notes" placeholder="How you know them, what to follow up on…" multiline />
           </div>

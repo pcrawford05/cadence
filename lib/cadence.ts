@@ -61,14 +61,26 @@ export function computeDue(c: Contact, today: Date = new Date(), s: CadenceSetti
   return { nextDue: dayToISO(due), daysOverdue: t - due, reason };
 }
 
-/** Suggest Active or Dormant from recency; manual tags (nurture, priority, new) pass through. */
+/** Statuses Cadence sets from recency. They are never stored; the rest are tags you set. */
+export const AUTO_STATUSES: readonly Status[] = ["active", "dormant"];
+export const manualStatuses = (list: Status[]) => list.filter((x) => !AUTO_STATUSES.includes(x));
+
+/**
+ * Live statuses: Active when you talked within half their rhythm, Dormant past twice it,
+ * plus your own tags (nurture, priority, new). No conversation or no rhythm means neither.
+ */
 export function suggestStatuses(c: Contact, today: Date = new Date(), s: CadenceSettings = DEFAULT_CADENCE): Status[] {
-  const manual = c.statuses.filter((x) => x === "nurture" || x === "priority" || x === "new");
+  const manual = manualStatuses(c.statuses);
   const cadence = cadenceFor(c, s);
-  if (!c.last_contact_at || cadence == null) return dedupe([...manual, ...c.statuses.filter((x) => x === "active" || x === "dormant")]);
+  if (!c.last_contact_at || cadence == null) return manual;
   const since = toDay(today) - toDay(c.last_contact_at);
   const auto: Status[] = since <= cadence / 2 ? ["active"] : since > cadence * 2 ? ["dormant"] : [];
   return dedupe([...auto, ...manual]);
+}
+
+/** Contacts as read from storage, with Active and Dormant filled in for today. */
+export function withLiveStatuses<T extends Contact>(list: T[], s: CadenceSettings, today = new Date()): T[] {
+  return list.map((c) => ({ ...c, statuses: suggestStatuses(c, today, s) }));
 }
 
 function dedupe<T>(a: T[]): T[] {

@@ -42,7 +42,7 @@ export default function ContactForm({ c }: { c?: Contact }) {
       <fieldset>
         <legend className="label">Status</legend>
         <div className="flex flex-wrap gap-2">
-          {STATUSES.map((s) => (
+          {STATUSES.filter((s) => s !== "active" && s !== "dormant").map((s) => (
             <label key={s} className="chip cursor-pointer capitalize has-[:checked]:border-ink has-[:checked]:bg-paper">
               <input type="checkbox" name="statuses" value={s} defaultChecked={c?.statuses.includes(s)} className="sr-only" />
               {s}

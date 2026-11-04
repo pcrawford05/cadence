@@ -1,8 +1,9 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { ImportRow } from "./csv";
 import {
-  CadenceSettings, Contact, ContactInput, DEFAULT_CADENCE, Interaction, InteractionKind, InteractionSource,
+  CadenceSettings, Contact, ContactInput, DEFAULT_CADENCE, Status, Interaction, InteractionKind, InteractionSource,
 } from "./types";
+import { manualStatuses, withLiveStatuses } from "./cadence";
 import { seedContacts, seedInteractions, seedLinkedIn } from "./demo-data";
 
 export interface LogInput {
@@ -88,6 +89,8 @@ const CONTACT_FIELDS = [
 function pick(p: Partial<ContactInput>) {
   const out: Record<string, unknown> = {};
   for (const k of CONTACT_FIELDS) if (k in p) out[k] = (p as Record<string, unknown>)[k];
+  // Active and Dormant are computed on read, so only your own tags are stored.
+  if (Array.isArray(out.statuses)) out.statuses = manualStatuses(out.statuses as Status[]);
   return out;
 }
 
@@ -97,9 +100,12 @@ export class SupabaseRepo implements Repo {
   constructor(private db: SupabaseClient, public userId: string) {}
 
   async listContactsBare() {
-    const { data, error } = await this.db.from("contacts").select("*").eq("user_id", this.userId).order("name");
+    const [{ data, error }, settings] = await Promise.all([
+      this.db.from("contacts").select("*").eq("user_id", this.userId).order("name"),
+      this.getSettings(),
+    ]);
     if (error) throw error;
-    return data as Contact[];
+    return withLiveStatuses(data as Contact[], settings.cadence);
   }
   async listContacts() {
     return signPhotos(this.db, await this.listContactsBare());
@@ -108,8 +114,11 @@ export class SupabaseRepo implements Repo {
     return signPhotos(this.db, contacts);
   }
   async getContact(id: string) {
-    const { data } = await this.db.from("contacts").select("*").eq("user_id", this.userId).eq("id", id).maybeSingle();
-    return data ? (await signPhotos(this.db, [data as Contact]))[0] : null;
+    const [{ data }, settings] = await Promise.all([
+      this.db.from("contacts").select("*").eq("user_id", this.userId).eq("id", id).maybeSingle(),
+      this.getSettings(),
+    ]);
+    return data ? (await signPhotos(this.db, withLiveStatuses([data as Contact], settings.cadence)))[0] : null;
   }
   async createContact(input: ContactInput) {
     const { data, error } = await this.db.from("contacts").insert({ ...pick(input), user_id: this.userId }).select().single();
@@ -212,10 +221,10 @@ const uid = () => Math.random().toString(36).slice(2, 10);
 
 export class DemoRepo implements Repo {
   userId = "demo-user";
-  async listContacts() { return [...store().contacts].sort((a, b) => a.name.localeCompare(b.name)); }
+  async listContacts() { return withLiveStatuses([...store().contacts].sort((a, b) => a.name.localeCompare(b.name)), store().settings.cadence); }
   async listContactsBare() { return this.listContacts(); }
   async withPhotos(c: Contact[]) { return c; }
-  async getContact(id: string) { return store().contacts.find((c) => c.id === id) ?? null; }
+  async getContact(id: string) { const c = store().contacts.find((x) => x.id === id); return c ? withLiveStatuses([c], store().settings.cadence)[0] : null; }
   async createContact(input: ContactInput) {
     const c: Contact = {
       id: uid(), user_id: this.userId, created_at: new Date().toISOString(), last_contact_at: null,

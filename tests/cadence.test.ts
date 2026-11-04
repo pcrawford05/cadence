@@ -53,6 +53,10 @@ describe("statuses and digest", () => {
     expect(suggestStatuses(base({ type: "orange", last_contact_at: "2026-10-10", statuses: ["nurture"] }), today)).toEqual(["active", "nurture"]);
     expect(suggestStatuses(base({ type: "red", last_contact_at: "2026-08-01" }), today)).toEqual(["dormant"]);
   });
+  it("stored active or dormant never sticks", () => {
+    expect(suggestStatuses(base({ type: "red", last_contact_at: "2026-10-18", statuses: ["dormant", "new"] }), today)).toEqual(["active", "new"]);
+    expect(suggestStatuses(base({ type: "purple", last_contact_at: "2026-10-18", statuses: ["active"] }), today)).toEqual([]);
+  });
   it("weekly re-nag", () => {
     expect([0, 1, 7, 14, -1].map(shouldNotify)).toEqual([true, false, true, true, false]);
   });

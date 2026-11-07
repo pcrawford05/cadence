@@ -1,5 +1,6 @@
 import type { Contact, ContactType, InteractionKind } from "./types";
 import { TYPES } from "./types";
+import { matchContact, matchesFocus, normalizeEmail } from "./match";
 
 /** One thing the AI thinks you should log. */
 export interface Draft {
@@ -132,9 +133,8 @@ async function callGemini(prompt: string, retried = false, attempt = 0, fast = f
 /** Compact directory so the model can match names without seeing everything. */
 function directory(contacts: Contact[], focusEmails: Set<string>, freeText = "", lean = false) {
   const words = new Set(freeText.toLowerCase().split(/[^a-z]+/).filter((w) => w.length > 2));
-  const relevant = contacts.filter((c) =>
-    c.emails.some((e) => focusEmails.has(e.toLowerCase())) || c.name.toLowerCase().split(/\s+/).some((p) => words.has(p)),
-  );
+  const normEmails = new Set([...focusEmails].map((e) => normalizeEmail(e)));
+  const relevant = contacts.filter((c) => matchesFocus(c, normEmails, words));
   if (lean) return relevant.slice(0, 40).map((c) => `${c.id} | ${c.name} | ${c.emails[0] ?? ""} | ${[c.position, c.company].filter(Boolean).join(" at ")}`).join("\n") || "(no likely matches)";
   const list = (relevant.length ? relevant : []).concat(contacts.filter((c) => !relevant.includes(c)).slice(0, Math.max(0, 150 - relevant.length)));
   return list.map((c) => `${c.id} | ${c.name} | ${c.emails.join(" ")} | ${[c.position, c.company].filter(Boolean).join(" at ")}`).join("\n");
@@ -143,14 +143,18 @@ function directory(contacts: Contact[], focusEmails: Set<string>, freeText = "",
 /** Validate model output against real ids and sane values. */
 function clean(raw: unknown[], contacts: Contact[], signalsCount: number, today: string): Draft[] {
   const ids = new Set(contacts.map((c) => c.id));
-  const byEmail = new Map<string, string>();
-  contacts.forEach((c) => c.emails.forEach((e) => byEmail.set(e.toLowerCase(), c.id)));
   const out: Draft[] = [];
   for (const x of raw as Record<string, any>[]) {
     if (!x || typeof x !== "object") continue;
     let contactId = typeof x.contact_id === "string" && ids.has(x.contact_id) ? x.contact_id : null;
     let np = x.new_person && typeof x.new_person.name === "string" && x.new_person.name.trim() ? x.new_person : null;
-    if (!contactId && np?.email && byEmail.has(String(np.email).toLowerCase())) { contactId = byEmail.get(String(np.email).toLowerCase())!; np = null; }
+    // The model only matches exact emails, so re-check deterministically:
+    // a new person from a second address, a shortened name, or a "Last, First"
+    // display name may already be in the directory.
+    if (!contactId && np) {
+      const hit = matchContact({ name: np.name, email: np.email ?? null }, contacts);
+      if (hit) { contactId = hit.id; np = null; }
+    }
     if (!contactId && !np) continue;
     const date = /^\d{4}-\d{2}-\d{2}$/.test(x.date) && x.date <= today ? x.date : today;
     const idx = Number.isInteger(x.signal_index) && x.signal_index >= 0 && x.signal_index < signalsCount ? x.signal_index : null;
@@ -215,13 +219,17 @@ export async function draftsFromSignals(signals: SignalInput[], contacts: Contac
 
 function promptFor(signals: SignalInput[], offset: number, contacts: Contact[], tz: string, today: string) {
   const emails = new Set(signals.flatMap((s) => s.participants.map((p) => p.email ?? "")).filter(Boolean));
+  // Titles and display names focus the directory, so a contact stored under a
+  // different address still shows up as a candidate (e.g. a signal from
+  // jack.crawford@ci.vc should surface Jack Crawford, stored under impactvc).
+  const focusText = signals.map((s) => [s.title, s.detail, s.participants.map((p) => p.name).join(" ")].filter(Boolean).join(" ")).join(" ");
   const items = signals.map((s, j) => [
     `[${offset + j}] ${s.source} · ${localDay(s.occurred_at, tz)}`,
     `title: ${s.title ?? "(none)"}`,
     s.detail ? `detail: ${s.detail}` : null,
     `with: ${s.participants.map((p) => [p.name, p.email].filter(Boolean).join(" ")).join("; ") || "(no guests listed)"}`,
   ].filter(Boolean).join("\n")).join("\n\n");
-  return `Today: ${today}\n\nDirectory (id | name | emails | role):\n${directory(contacts, emails)}\n\nItems from the user's calendar and email:\n${items}\n\nPropose entries to log.`;
+  return `Today: ${today}\n\nDirectory (id | name | emails | role):\n${directory(contacts, emails, focusText)}\n\nItems from the user's calendar and email:\n${items}\n\nPropose entries to log.`;
 }
 
 /** "I texted Mia about the hackathon yesterday" -> drafts. */
@@ -245,12 +253,10 @@ export async function draftsFromText(text: string, contacts: Contact[], tz: stri
 /* ---------------- Offline fallbacks ---------------- */
 
 function heuristic(signals: SignalInput[], contacts: Contact[], tz: string): Draft[] {
-  const byEmail = new Map<string, Contact>();
-  contacts.forEach((c) => c.emails.forEach((e) => byEmail.set(e.toLowerCase(), c)));
   const out: Draft[] = [];
   signals.forEach((s, i) => {
     for (const p of s.participants) {
-      const c = p.email ? byEmail.get(p.email) : undefined;
+      const c = matchContact({ name: p.name, email: p.email }, contacts);
       if (!c && !(s.source === "calendar" && p.name)) continue;
       out.push({
         signalIndex: i, contactId: c?.id ?? null,

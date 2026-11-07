@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Repo } from "./repo";
 import { draftsFromSignals, draftsFromText, type Draft, type SignalInput } from "./ai";
+import { matchContact } from "./match";
 import type { ContactType, InteractionKind } from "./types";
 
 export interface Signal extends SignalInput { id: string; external_id: string; processed: boolean }
@@ -143,6 +144,12 @@ export async function approve(store: RecapStore, repo: Repo, id: string, edits: 
   if (!p || p.status !== "pending") throw new Error("Already handled");
   let contactId = p.contact_id;
   let created = false;
+  if (!contactId && p.new_contact) {
+    // A proposal drafted before matching improved may name someone who is
+    // already in the directory. Link it instead of creating a duplicate.
+    const existing = matchContact({ name: p.new_contact.name, email: p.new_contact.email ?? null }, await repo.listContactsBare());
+    if (existing) contactId = existing.id;
+  }
   if (!contactId) {
     const n = p.new_contact!;
     const type: ContactType = n.type ?? "purple";

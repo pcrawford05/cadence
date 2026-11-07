@@ -8,7 +8,13 @@ const contact = (o: Partial<Contact>): Contact => ({
   source: "manual", linkedin_connected_on: null, triaged_at: "2026-01-01", notes: null, snoozed_until: null, last_contact_at: null,
   created_at: "2026-01-01", ...o,
 });
-const contacts = [contact({ id: "c-maya", name: "Maya Okafor", emails: ["maya@x.com"] }), contact({ id: "c-sam", name: "Sam Ortiz", emails: ["sam@x.com"] })];
+const contacts = [
+  contact({ id: "c-maya", name: "Maya Okafor", emails: ["maya@x.com"] }),
+  contact({ id: "c-sam", name: "Sam Ortiz", emails: ["sam@x.com"] }),
+  contact({ id: "c-jack", name: "Jack Crawford", emails: ["jack@impactvc.com"] }),
+  contact({ id: "c-danwu", name: "Dan Wu", emails: ["dan@heyjoyful.com"] }),
+  contact({ id: "c-danwad", name: "Dan Wadhwani", emails: ["dwadhwani@marshall.usc.edu"] }),
+];
 
 function mockGemini(entries: unknown[]) {
   const fetchMock = vi.fn(async () => new Response(JSON.stringify({ candidates: [{ content: { parts: [{ text: JSON.stringify({ entries }) }] } }] }), { status: 200 }));
@@ -43,6 +49,30 @@ describe("Gemini output is validated", () => {
     expect(await draftsFromText("coffee with maya", contacts, "America/Los_Angeles")).toHaveLength(1);
   });
 
+  it("maps a new person from a second address to the existing contact", async () => {
+    mockGemini([
+      { signal_index: 0, contact_id: null, new_person: { name: "Jack Crawford", email: "jack.crawford@ci.vc" }, date: "2026-11-06", kind: "meeting", summary: "Met", confidence: 0.9 },
+    ]);
+    const d = await draftsFromSignals(
+      [{ source: "calendar", occurred_at: "2026-11-06T20:00:00Z", title: "Jimmy x Jack Crawford", detail: null, participants: [{ email: "jack.crawford@ci.vc", name: "Jack Crawford" }] }],
+      contacts, "America/Los_Angeles",
+    );
+    expect(d).toHaveLength(1);
+    expect(d[0].contactId).toBe("c-jack");
+    expect(d[0].newPerson).toBeNull();
+  });
+
+  it("maps a shortened name to the existing contact", async () => {
+    mockGemini([
+      { signal_index: 0, contact_id: null, new_person: { name: "Isa Silva", email: "isasilva@hiafan.com" }, date: "2026-11-05", kind: "meeting", summary: "Met", confidence: 0.9 },
+    ]);
+    const d = await draftsFromSignals(
+      [{ source: "calendar", occurred_at: "2026-11-05T20:00:00Z", title: "30 Min With Peyton (Isael Silva)", detail: null, participants: [{ email: "isasilva@hiafan.com", name: null }] }],
+      [contact({ id: "c-isa", name: "Isael Silva", emails: ["isael@hiafan.com"] })], "America/Los_Angeles",
+    );
+    expect(d[0].contactId).toBe("c-isa");
+  });
+
   it("surfaces rate limits clearly", async () => {
     vi.stubGlobal("fetch", vi.fn(async () => new Response("quota", { status: 429 })));
     await expect(draftsFromText("hi", contacts, "America/Los_Angeles")).rejects.toThrow(/free limit/);
@@ -57,5 +87,23 @@ describe("without a key", () => {
       { source: "calendar", occurred_at: "2026-10-21T20:00:00Z", title: "Chat", detail: null, participants: [{ email: "new@y.com", name: "New Person" }] },
     ], contacts, "America/Los_Angeles");
     expect(d.map((x) => x.contactId ?? x.newPerson?.name)).toEqual(["c-sam", "New Person"]);
+  });
+
+  it("rule-based pass matches a Last, First calendar guest by name", async () => {
+    delete process.env.GEMINI_API_KEY;
+    const d = await draftsFromSignals([
+      { source: "calendar", occurred_at: "2026-11-06T20:00:00Z", title: "Robert's pitch", detail: null, participants: [{ email: "jackc553@marshall.usc.edu", name: "Crawford, Jack" }] },
+    ], contacts, "America/Los_Angeles");
+    expect(d.map((x) => x.contactId ?? x.newPerson?.name)).toEqual(["c-jack"]);
+  });
+
+  it("rule-based pass never merges an ambiguous first name", async () => {
+    delete process.env.GEMINI_API_KEY;
+    const d = await draftsFromSignals([
+      { source: "calendar", occurred_at: "2026-11-06T20:00:00Z", title: "Call", detail: null, participants: [{ email: "dan@unknown.com", name: "Dan" }] },
+    ], contacts, "America/Los_Angeles");
+    expect(d).toHaveLength(1);
+    expect(d[0].contactId).toBeNull();
+    expect(d[0].newPerson?.name).toBe("Dan");
   });
 });

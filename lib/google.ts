@@ -1,3 +1,4 @@
+import { MEETING_SUBJECT } from "./ai";
 import { google } from "googleapis";
 import type { Repo } from "./repo";
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -126,11 +127,13 @@ export async function syncGoogle(
     if (!senders.has(me) || !lastDate) continue;
     const others = [...senders].filter((e) => e !== me && !/no-?reply|notifications?@|mailer|calendar-notification/.test(e));
     if (!others.length) continue;
+    // Recap logs meetings only: keep threads whose subject points to one, drop plain email.
+    if (!MEETING_SUBJECT.test(subject)) continue;
 
     if (cutoff && lastDate < cutoff) {
       for (const e of others) {
         const cid = byEmail.get(e);
-        if (cid && (await repo.logInteraction({ contact_id: cid, occurred_at: lastDate, kind: "email", source: "gmail", external_id: `${id}:${lastDate.slice(0, 10)}`, summary: subject || "Email thread" }))) res.emails++;
+        if (cid && (await repo.logInteraction({ contact_id: cid, occurred_at: lastDate, kind: "meeting", source: "gmail", external_id: `${id}:${lastDate.slice(0, 10)}`, summary: subject || "Met" }))) res.emails++;
       }
       continue;
     }

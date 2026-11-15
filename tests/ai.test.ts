@@ -35,10 +35,17 @@ describe("Gemini output is validated", () => {
     ]);
     const d = await draftsFromSignals([{ source: "calendar", occurred_at: "2026-10-21T20:00:00Z", title: "Coffee", detail: null, participants: [{ email: "maya@x.com", name: "Maya" }] }], contacts, "America/Los_Angeles");
     expect(f).toHaveBeenCalledOnce();
-    expect(d.map((x) => x.contactId ?? x.newPerson?.name)).toEqual(["c-maya", "c-sam", "Sarah Lin"]);
-    expect(d[1].signalIndex).toBeNull(); // out-of-range index dropped
-    expect(d[2]).toMatchObject({ kind: "meeting", summary: "Talked", confidence: 1 }); // sanitized
-    expect(d[2].date <= new Date().toISOString().slice(0, 10)).toBe(true); // future date clamped
+    expect(d.map((x) => x.contactId ?? x.newPerson?.name)).toEqual(["c-maya", "Sarah Lin"]); // email-only entry dropped
+    expect(d[1].signalIndex).toBeNull();
+    expect(d[1]).toMatchObject({ kind: "meeting", summary: "Talked", confidence: 1 }); // sanitized
+    expect(d[1].date <= new Date().toISOString().slice(0, 10)).toBe(true); // future date clamped
+  });
+
+  it("plain email threads never become proposals offline", async () => {
+    delete process.env.GEMINI_API_KEY;
+    const sig = (title: string) => ({ source: "gmail" as const, occurred_at: "2026-10-21T20:00:00Z", title, detail: null, participants: [{ email: "maya@x.com", name: "Maya" }] });
+    const d = await draftsFromSignals([sig("Re: deck feedback"), sig("Coffee Thursday?")], contacts, "America/Los_Angeles");
+    expect(d.map((x) => [x.signalIndex, x.kind])).toEqual([[1, "meeting"]]);
   });
 
   it("one entry per person per day", async () => {
@@ -83,7 +90,7 @@ describe("without a key", () => {
   it("rule-based pass matches known emails and named calendar guests", async () => {
     delete process.env.GEMINI_API_KEY;
     const d = await draftsFromSignals([
-      { source: "gmail", occurred_at: "2026-10-21T20:00:00Z", title: "Re: intro", detail: null, participants: [{ email: "sam@x.com", name: "Sam" }, { email: "rando@x.com", name: "Rando" }] },
+      { source: "gmail", occurred_at: "2026-10-21T20:00:00Z", title: "Re: coffee next week", detail: null, participants: [{ email: "sam@x.com", name: "Sam" }, { email: "rando@x.com", name: "Rando" }] },
       { source: "calendar", occurred_at: "2026-10-21T20:00:00Z", title: "Chat", detail: null, participants: [{ email: "new@y.com", name: "New Person" }] },
     ], contacts, "America/Los_Angeles");
     expect(d.map((x) => x.contactId ?? x.newPerson?.name)).toEqual(["c-sam", "New Person"]);

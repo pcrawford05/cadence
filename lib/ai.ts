@@ -21,6 +21,9 @@ export interface SignalInput {
   participants: { email: string | null; name: string | null }[];
 }
 
+/** Email subjects that point to a meeting (set up, confirmed, or followed up). Plain email threads are not conversations. */
+export const MEETING_SUBJECT = /\b(coffee|lunch|dinner|breakfast|drinks|meet(ing)?|met|call|chat|zoom|google meet|teams|facetime|catch[- ]?up|1:1|one[- ]on[- ]one|invitation|invite|calendar|schedul\w*|reschedul\w*|availability|office hours|interview|thanks for (meeting|chatting|the call|your time|taking the time)|great (meeting|chatting|talking)|nice (meeting|chatting|talking)|good to (meet|see|talk))\b/i;
+
 const BASE = "https://generativelanguage.googleapis.com/v1beta";
 let resolved: string | null = null;
 let ranked: string[] = [];
@@ -68,7 +71,7 @@ const SCHEMA = {
             required: ["name"],
           },
           date: { type: "STRING", description: "YYYY-MM-DD" },
-          kind: { type: "STRING", enum: ["meeting", "call", "email", "manual"], description: "manual = text, DM, or other" },
+          kind: { type: "STRING", enum: ["meeting", "call", "manual"], description: "meeting = in person or video; manual = text, DM, or other (free text only)" },
           summary: { type: "STRING", description: "One short sentence on what was discussed. Grounded only in the input." },
           confidence: { type: "NUMBER", description: "0 to 1: how likely a real 1:1 conversation happened" },
         },
@@ -81,11 +84,13 @@ const SCHEMA = {
 
 const SYSTEM = `You help a student log networking conversations in a personal CRM.
 Rules:
-- Only propose real conversations with specific people. Skip newsletters, automated mail, receipts, mass events, class logistics, and anything with no identifiable person.
+- Only propose real meetings with specific people: in person, a call, or a video chat. An email exchange by itself is not a meeting; skip it.
+- Use an email only when it shows a meeting happened or was set for that day (a coffee or call being confirmed, a calendar invitation, "thanks for meeting"). Log it as the meeting, not as an email.
+- Skip newsletters, automated mail, receipts, mass events, class logistics, and anything with no identifiable person.
 - One entry per person per day. A meeting with two people yields two entries.
 - Match people to the directory by email first, then by clear name match. Use the directory id exactly. If unsure or not present, set contact_id null and fill new_person with only facts given in the input.
-- Summaries: one sentence, past tense, about the topic. Use only the title/subject/description or the user's words. Never invent details. If the topic is unknown, write "Met" or "Emailed" plus the subject.
-- Confidence: about 0.9 for a 1:1 calendar meeting or a named coffee/call; about 0.6 for an email thread; below 0.4 for ambiguous items.
+- Summaries: one sentence, past tense, about the topic. Use only the title/subject/description or the user's words. Never invent details. If the topic is unknown, write "Met" plus the subject.
+- Confidence: about 0.9 for a 1:1 calendar meeting or a named coffee/call; about 0.6 for a meeting known only from email; below 0.4 for ambiguous items.
 - Dates are local dates (YYYY-MM-DD). For free text, resolve words like "yesterday" relative to Today.`;
 
 async function callGemini(prompt: string, retried = false, attempt = 0, fast = false, deadline = Infinity): Promise<unknown[]> {
@@ -156,6 +161,7 @@ function clean(raw: unknown[], contacts: Contact[], signalsCount: number, today:
       if (hit) { contactId = hit.id; np = null; }
     }
     if (!contactId && !np) continue;
+    if (x.kind === "email") continue; // Recap logs meetings only
     const date = /^\d{4}-\d{2}-\d{2}$/.test(x.date) && x.date <= today ? x.date : today;
     const idx = Number.isInteger(x.signal_index) && x.signal_index >= 0 && x.signal_index < signalsCount ? x.signal_index : null;
     out.push({
@@ -168,7 +174,7 @@ function clean(raw: unknown[], contacts: Contact[], signalsCount: number, today:
         notes: np.notes ?? null, type: (TYPES as readonly string[]).includes(np.type) ? np.type : null,
       },
       date,
-      kind: ["meeting", "call", "email", "manual"].includes(x.kind) ? x.kind : "meeting",
+      kind: ["meeting", "call", "manual"].includes(x.kind) ? x.kind : "meeting",
       summary: String(x.summary ?? "").trim().slice(0, 300) || "Talked",
       confidence: Math.max(0, Math.min(1, Number(x.confidence) || 0.5)),
     });
@@ -255,6 +261,7 @@ export async function draftsFromText(text: string, contacts: Contact[], tz: stri
 function heuristic(signals: SignalInput[], contacts: Contact[], tz: string): Draft[] {
   const out: Draft[] = [];
   signals.forEach((s, i) => {
+    if (s.source === "gmail" && !MEETING_SUBJECT.test(s.title ?? "")) return; // email alone isn't a meeting
     for (const p of s.participants) {
       const c = matchContact({ name: p.name, email: p.email }, contacts);
       if (!c && !(s.source === "calendar" && p.name)) continue;
@@ -262,8 +269,8 @@ function heuristic(signals: SignalInput[], contacts: Contact[], tz: string): Dra
         signalIndex: i, contactId: c?.id ?? null,
         newPerson: c ? null : { name: p.name!, email: p.email },
         date: localDay(s.occurred_at, tz),
-        kind: s.source === "calendar" ? "meeting" : "email",
-        summary: s.title ? `${s.source === "calendar" ? "Met" : "Emailed"}: ${s.title}` : s.source === "calendar" ? "Met" : "Emailed",
+        kind: "meeting",
+        summary: s.title ? `Met: ${s.title}` : "Met",
         confidence: s.source === "calendar" ? 0.8 : 0.55,
       });
     }
